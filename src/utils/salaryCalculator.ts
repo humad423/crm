@@ -1,0 +1,343 @@
+import {
+  ExceptionEvent,
+  Holiday,
+  UserSettings,
+  MonthlyCalculationResult,
+  WeeklyBreakdown,
+  DayBreakdown,
+} from '../types/salary';
+
+/**
+ * Checks if a given date string (YYYY-MM-DD) is a public holiday
+ */
+export function checkIsHoliday(dateStr: string, holidays: Holiday[]): { isHoliday: boolean; name?: string } {
+  const holiday = holidays.find((h) => h.date === dateStr);
+  return {
+    isHoliday: !!holiday,
+    name: holiday ? holiday.localName || holiday.name : undefined,
+  };
+}
+
+/**
+ * Gets the number of days in a month (accounting for leap years, etc.)
+ */
+export function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+/**
+ * Formats a Date object as YYYY-MM-DD in local time
+ */
+export function formatDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Parse date string YYYY-MM-DD into a local Date object
+ */
+export function parseDateStr(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * Generates all day breakdowns for the given month, including schedules, holidays, and exceptions.
+ */
+export function generateMonthlyBreakdown(
+  year: number,
+  month: number, // 0-based
+  settings: UserSettings,
+  exceptions: ExceptionEvent[],
+  holidays: Holiday[]
+): DayBreakdown[] {
+  const daysInMonth = getDaysInMonth(year, month);
+  const breakdowns: DayBreakdown[] = [];
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const dateStr = formatDateStr(date);
+    const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+
+    const { isHoliday, name: holidayName } = checkIsHoliday(dateStr, holidays);
+    
+    // Is it a scheduled work day? (Mon-Fri, i.e., 1 to 5)
+    // Even if it's a holiday, it remains scheduled, but we adjust actual work if absent
+    const isScheduledWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+    const defaultScheduledHours = isScheduledWeekday ? settings.defaultDailyHours : 0;
+
+    // Find exceptions for this day
+    const dayExceptions = exceptions.filter((e) => e.date === dateStr);
+    
+    const absenceEvent = dayExceptions.find((e) => e.type === 'absence');
+    const delayEvent = dayExceptions.find((e) => e.type === 'delay');
+    const overtimeEvents = dayExceptions.filter((e) => e.type === 'overtime');
+
+    const isAbsent = !!absenceEvent;
+    const delayHours = delayEvent?.hours || 0;
+    const absenceDays = isAbsent ? 1 : 0;
+
+    // Calculate actual regular weekday hours worked
+    let actualWeekdayHoursWorked = 0;
+    let weekdayOvertimeHours = 0;
+    let saturdayOvertimeHours = 0;
+    let sundayHolidayOvertimeHours = 0;
+
+    if (isScheduledWeekday) {
+      if (isAbsent) {
+        actualWeekdayHoursWorked = 0;
+      } else {
+        // Delay reduces standard hours worked
+        actualWeekdayHoursWorked = Math.max(0, defaultScheduledHours - delayHours);
+      }
+
+      // Add weekday overtime
+      const weekdayOt = overtimeEvents.find((e) => e.overtimeType === 'weekday');
+      if (weekdayOt?.hours) {
+        weekdayOvertimeHours = weekdayOt.hours;
+      }
+    } else {
+      // Weekend: no standard scheduled hours
+      actualWeekdayHoursWorked = 0;
+    }
+
+    // Weekend or holiday overtime
+    if (isHoliday) {
+      // Any work on public holiday is holiday overtime (2x)
+      const holidayOt = overtimeEvents.find((e) => e.overtimeType === 'holiday' || e.overtimeType === 'weekday' || e.overtimeType === 'saturday' || e.overtimeType === 'sunday');
+      if (holidayOt?.hours) {
+        sundayHolidayOvertimeHours = holidayOt.hours;
+      }
+    } else {
+      if (dayOfWeek === 6) { // Saturday
+        const satOt = overtimeEvents.find((e) => e.overtimeType === 'saturday');
+        if (satOt?.hours) {
+          saturdayOvertimeHours = satOt.hours;
+        }
+      } else if (dayOfWeek === 0) { // Sunday
+        const sunOt = overtimeEvents.find((e) => e.overtimeType === 'sunday');
+        if (sunOt?.hours) {
+          sundayHolidayOvertimeHours = sunOt.hours;
+        }
+      }
+    }
+
+    breakdowns.push({
+      date: dateStr,
+      dayOfWeek,
+      isHoliday,
+      holidayName,
+      defaultScheduledHours,
+      actualWeekdayHoursWorked,
+      delayHours,
+      absenceDays,
+      weekdayOvertimeHours,
+      saturdayOvertimeHours,
+      sundayHolidayOvertimeHours,
+    });
+  }
+
+  return breakdowns;
+}
+
+/**
+ * Groups day breakdowns into weeks (Monday to Sunday) and performs Weekly Equalization.
+ */
+export function calculateWeeklyEqualization(
+  dayBreakdowns: DayBreakdown[],
+  settings: UserSettings
+): WeeklyBreakdown[] {
+  // Group days by calendar week.
+  // We can identify a week by finding the Monday of the week.
+  const weeksMap = new Map<number, DayBreakdown[]>();
+  
+  dayBreakdowns.forEach((day) => {
+    const dateObj = parseDateStr(day.date);
+    
+    // Find the Monday of this week.
+    // getDay() is 0 for Sun, 1 for Mon, etc.
+    const dayVal = dateObj.getDay();
+    const diff = dateObj.getDate() - dayVal + (dayVal === 0 ? -6 : 1);
+    const mondayDate = new Date(dateObj.setDate(diff));
+    
+    // Use the time representation of Monday as the key
+    mondayDate.setHours(0, 0, 0, 0);
+    const key = mondayDate.getTime();
+
+    if (!weeksMap.has(key)) {
+      weeksMap.set(key, []);
+    }
+    weeksMap.get(key)!.push(day);
+  });
+
+  // Sort weeks chronologically
+  const sortedWeekKeys = Array.from(weeksMap.keys()).sort((a, b) => a - b);
+
+  return sortedWeekKeys.map((weekKey, idx) => {
+    const days = weeksMap.get(weekKey)!;
+    // Sort days chronologically
+    days.sort((a, b) => a.date.localeCompare(b.date));
+
+    const dates = days.map((d) => d.date);
+    const firstDate = parseDateStr(days[0].date);
+    const lastDate = parseDateStr(days[days.length - 1].date);
+    
+    const weekLabel = `الأسبوع ${idx + 1} (${firstDate.getDate()}/${firstDate.getMonth() + 1} - ${lastDate.getDate()}/${lastDate.getMonth() + 1})`;
+
+    // Calculate baseline figures
+    // Expected hours is based on scheduled weekdays inside this month for this week
+    let expectedHours = 0;
+    let actualWeekdayHours = 0;
+    let absenceDeductions = 0;
+    let delayHours = 0;
+    let weekdayOvertimeHours = 0;
+    let saturdayOvertimeHours = 0;
+    let sundayHolidayOvertimeHours = 0;
+
+    days.forEach((day) => {
+      expectedHours += day.defaultScheduledHours;
+      actualWeekdayHours += day.actualWeekdayHoursWorked;
+      absenceDeductions += day.absenceDays;
+      delayHours += day.delayHours;
+      weekdayOvertimeHours += day.weekdayOvertimeHours;
+      saturdayOvertimeHours += day.saturdayOvertimeHours;
+      sundayHolidayOvertimeHours += day.sundayHolidayOvertimeHours;
+    });
+
+    // Weekly Equalization (Denkleştirme) Logic:
+    // Standard weekly hours target is expectedHours (which is typically 45 for a full week of 5 days * 9 hours).
+    // If actualWeekdayHours < expectedHours, there is a deficit.
+    const deficitHours = Math.max(0, expectedHours - actualWeekdayHours);
+
+    let overtimeHours1x = 0;
+    let overtimeHours1_5x = 0;
+    let overtimeHours2x = 0;
+
+    if (deficitHours === 0) {
+      // No deficit! Standard multipliers apply directly.
+      overtimeHours1_5x = weekdayOvertimeHours + saturdayOvertimeHours;
+      overtimeHours2x = sundayHolidayOvertimeHours;
+    } else {
+      // We have a deficit! We must use overtime/weekend hours to cover it.
+      // Pool of overtime hours, divided by multipliers:
+      // 1.5x Pool: Weekday evening overtime + Saturday hours
+      // 2.0x Pool: Sunday + Holiday hours
+      let pool1_5x = weekdayOvertimeHours + saturdayOvertimeHours;
+      let pool2_0x = sundayHolidayOvertimeHours;
+
+      let remainingDeficit = deficitHours;
+
+      // 1. First cover deficit using 1.5x pool (cheaper multiplier for employer, fairer prioritization)
+      const usedFrom1_5x = Math.min(remainingDeficit, pool1_5x);
+      overtimeHours1x += usedFrom1_5x;
+      pool1_5x -= usedFrom1_5x;
+      remainingDeficit -= usedFrom1_5x;
+
+      // 2. If there is still deficit, cover using 2.0x pool
+      const usedFrom2_0x = Math.min(remainingDeficit, pool2_0x);
+      overtimeHours1x += usedFrom2_0x;
+      pool2_0x -= usedFrom2_0x;
+      remainingDeficit -= usedFrom2_0x;
+
+      // Remaining pools are paid at their premium rate
+      overtimeHours1_5x = pool1_5x;
+      overtimeHours2x = pool2_0x;
+    }
+
+    return {
+      weekIndex: idx + 1,
+      weekLabel,
+      dates,
+      expectedHours,
+      actualWeekdayHours,
+      absenceDeductions,
+      delayHours,
+      weekdayOvertimeHours,
+      saturdayOvertimeHours,
+      sundayHolidayOvertimeHours,
+      deficitHours,
+      overtimeHours1x,
+      overtimeHours1_5x,
+      overtimeHours2x,
+    };
+  });
+}
+
+/**
+ * Computes the final salary breakdown for the month
+ */
+export function calculateMonthlySalary(
+  year: number,
+  month: number, // 0-based
+  settings: UserSettings,
+  exceptions: ExceptionEvent[],
+  holidays: Holiday[]
+): MonthlyCalculationResult {
+  const { baseSalary, multiplierWeekdaySat, multiplierSundayHoliday } = settings;
+
+  // 1. Calculate base rates:
+  // - Accounting month is always 30 days. Daily wage = Salary / 30.
+  // - Total standard monthly hours = 225. Regular hourly wage = Salary / 225.
+  const dailyWage = baseSalary / 30;
+  const regularHourlyWage = baseSalary / 225;
+
+  // 2. Generate daily breakdown & perform weekly calculations
+  const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays);
+  const weeklyBreakdowns = calculateWeeklyEqualization(dayBreakdowns, settings);
+
+  // 3. Aggregate results across weeks
+  let totalAbsenceDays = 0;
+  let totalDelayHours = 0;
+  let overtime1xHours = 0;
+  let overtime1_5xHours = 0;
+  let overtime2xHours = 0;
+
+  // Delay hours and absence days are counted globally for deductions
+  dayBreakdowns.forEach((day) => {
+    totalAbsenceDays += day.absenceDays;
+    totalDelayHours += day.delayHours;
+  });
+
+  weeklyBreakdowns.forEach((week) => {
+    overtime1xHours += week.overtimeHours1x;
+    overtime1_5xHours += week.overtimeHours1_5x;
+    overtime2xHours += week.overtimeHours2x;
+  });
+
+  // 4. Calculate payouts and deductions
+  // - Absence deduction: 1 day absence = shift hours * hourly wage deduction
+  const totalAbsenceDeduction = totalAbsenceDays * settings.defaultDailyHours * regularHourlyWage;
+
+  // - Delay deduction: hourly wage * delay hours
+  const totalDelayDeduction = totalDelayHours * regularHourlyWage;
+
+  // - Overtime payout:
+  const overtime1xPay = overtime1xHours * regularHourlyWage;
+  const overtime1_5xPay = overtime1_5xHours * regularHourlyWage * multiplierWeekdaySat;
+  const overtime2xPay = overtime2xHours * regularHourlyWage * multiplierSundayHoliday;
+  const totalOvertimePay = overtime1xPay + overtime1_5xPay + overtime2xPay;
+
+  // - Net salary calculation: Base Salary - Deductions + Overtime Pay
+  const netSalary = baseSalary - totalAbsenceDeduction - totalDelayDeduction + totalOvertimePay;
+
+  return {
+    baseSalary,
+    dailyWage,
+    regularHourlyWage,
+    totalAbsenceDays,
+    totalAbsenceDeduction,
+    totalDelayHours,
+    totalDelayDeduction,
+    overtime1xHours,
+    overtime1xPay,
+    overtime1_5xHours,
+    overtime1_5xPay,
+    overtime2xHours,
+    overtime2xPay,
+    totalOvertimePay,
+    netSalary,
+    weeklyBreakdowns,
+  };
+}
