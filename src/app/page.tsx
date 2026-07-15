@@ -23,17 +23,16 @@ export default function Home() {
     exportMonthToCSV(year, month, months[month], settings, calculationResult, dayBreakdowns);
   };
 
-  // Load and apply theme
+  // Load and apply theme (Defaulting to light mode)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) {
-        setTheme(savedTheme as 'light' | 'dark');
-        document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+      if (savedTheme === 'dark') {
+        setTheme('dark');
+        document.documentElement.classList.add('dark');
       } else {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        setTheme(prefersDark ? 'dark' : 'light');
-        document.documentElement.classList.toggle('dark', prefersDark);
+        setTheme('light');
+        document.documentElement.classList.remove('dark');
       }
     }
   }, []);
