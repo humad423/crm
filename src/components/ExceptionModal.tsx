@@ -12,7 +12,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
   const { exceptions, addException, deleteExceptionByDate, holidays } = useSalary();
   
   const [eventType, setEventType] = useState<ExceptionType>('overtime');
-  const [hours, setHours] = useState<number>(2);
+  const [hours, setHours] = useState<number>(8);
   const [overtimeType, setOvertimeType] = useState<OvertimeType>('weekday');
   const [note, setNote] = useState<string>('');
 
@@ -24,7 +24,8 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
   // Determine weekday index to pre-select appropriate overtime type
   useEffect(() => {
     if (dateStr) {
-      const date = new Date(dateStr);
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
       const dayVal = date.getDay(); // 0 = Sunday, 6 = Saturday, 1-5 = Weekday
       
       // Auto-set Overtime Type based on day of week / holiday status
@@ -44,12 +45,12 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
       if (existingExceptions.length > 0) {
         const primary = existingExceptions[0];
         setEventType(primary.type);
-        setHours(primary.hours || (autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 2));
+        setHours(primary.hours || 8);
         setOvertimeType(primary.overtimeType || autoOtType);
         setNote(primary.note || '');
       } else {
         setEventType('overtime');
-        setHours(autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 2);
+        setHours(8);
         setNote('');
       }
     }
@@ -171,17 +172,17 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: 'weekday', label: 'مسائي (إثنين - جمعة)', defaultHours: 2 },
-                    { value: 'saturday', label: 'يوم السبت', defaultHours: 8 },
-                    { value: 'sunday', label: 'يوم الأحد', defaultHours: 8 },
-                    { value: 'holiday', label: 'عطلة رسمية', defaultHours: 8 },
+                    { value: 'weekday', label: 'مسائي (إثنين - جمعة)' },
+                    { value: 'saturday', label: 'يوم السبت' },
+                    { value: 'sunday', label: 'يوم الأحد' },
+                    { value: 'holiday', label: 'عطلة رسمية' },
                   ].map((ot) => (
                     <button
                       key={ot.value}
                       type="button"
                       onClick={() => {
                         setOvertimeType(ot.value as OvertimeType);
-                        setHours(ot.defaultHours);
+                        setHours(8);
                       }}
                       className={`py-2 px-3 text-xs font-semibold rounded-xl border text-center transition-all ${
                         overtimeType === ot.value
