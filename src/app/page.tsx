@@ -8,9 +8,10 @@ import SalaryCalendar from '../components/SalaryCalendar';
 import SettingsPanel from '../components/SettingsPanel';
 import ExceptionModal from '../components/ExceptionModal';
 import AuthScreen from '../components/AuthScreen';
-import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download, LogOut } from 'lucide-react';
+import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download, LogOut, FileText } from 'lucide-react';
 import { generateMonthlyBreakdown } from '../utils/salaryCalculator';
 import { exportMonthToCSV } from '../utils/csvExporter';
+import { exportMonthToPDF } from '../utils/pdfExporter';
 
 export default function Home() {
   const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized, user, logout } = useSalary();
@@ -21,6 +22,11 @@ export default function Home() {
   const handleExportCSV = () => {
     const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays);
     exportMonthToCSV(year, month, months[month], settings, calculationResult, dayBreakdowns);
+  };
+
+  const handleExportPDF = () => {
+    const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays);
+    exportMonthToPDF(year, month, months[month], settings, calculationResult, dayBreakdowns, exceptions);
   };
 
   // Load and apply theme (Defaulting to light mode)
@@ -191,7 +197,17 @@ export default function Home() {
               className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-850/40 transition-all"
             >
               <Download className="w-4 h-4" />
-              تصدير الشهر كـ CSV
+              تصدير كـ CSV
+            </button>
+
+            {/* Export PDF Action */}
+            <button
+              onClick={handleExportPDF}
+              type="button"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+            >
+              <FileText className="w-4 h-4" />
+              تصدير تقرير PDF
             </button>
           </div>
         </div>

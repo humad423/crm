@@ -49,9 +49,9 @@ export function exportMonthToCSV(
     'ساعات العمل الفعلية المنفذة',
     'الغياب',
     'التأخير (ساعات)',
-    'إضافي مسائي (ساعات)',
-    'إضافي السبت (ساعات)',
-    'إضافي الأحد/العطل (ساعات)'
+    'إضافي بمعدل 1.0x (ساعات)',
+    'إضافي بمعدل 1.5x (ساعات)',
+    'إضافي بمعدل 2.0x (ساعات)'
   ];
 
   csvContent += headers.join(',') + '\n';
@@ -72,9 +72,9 @@ export function exportMonthToCSV(
       day.actualWeekdayHoursWorked,
       day.absenceDays > 0 ? 'نعم' : 'لا',
       day.delayHours,
-      day.weekdayOvertimeHours,
-      day.saturdayOvertimeHours,
-      day.sundayHolidayOvertimeHours
+      day.flatOvertimeHours || 0,
+      (day.weekdayOvertimeHours || 0) + (day.saturdayOvertimeHours || 0),
+      day.sundayHolidayOvertimeHours || 0
     ];
 
     csvContent += row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\n';
