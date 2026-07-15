@@ -11,6 +11,7 @@ interface SalaryContextType {
   exceptions: ExceptionEvent[];
   holidays: Holiday[];
   isLoadingHolidays: boolean;
+  isInitialized: boolean;
   calculationResult: MonthlyCalculationResult;
   setMonthYear: (year: number, month: number) => void;
   updateSettings: (settings: Partial<UserSettings>) => void;
@@ -44,12 +45,19 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   // Load from LocalStorage on mount
   useEffect(() => {
-    const today = new Date();
-    // Set default month/year to local time if we can
-    setYear(today.getFullYear());
-    setMonth(today.getMonth());
-
     if (typeof window !== 'undefined') {
+      const today = new Date();
+      let initialYear = today.getFullYear();
+      let initialMonth = today.getMonth();
+
+      const savedYear = localStorage.getItem('salary_selected_year');
+      const savedMonth = localStorage.getItem('salary_selected_month');
+      if (savedYear) initialYear = Number(savedYear);
+      if (savedMonth) initialMonth = Number(savedMonth);
+      
+      setYear(initialYear);
+      setMonth(initialMonth);
+
       const savedSettings = localStorage.getItem('salary_settings');
       if (savedSettings) {
         try {
@@ -119,11 +127,15 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     setSettings(defaultSettings);
     localStorage.removeItem('salary_settings');
     localStorage.removeItem('salary_exceptions');
+    localStorage.removeItem('salary_selected_year');
+    localStorage.removeItem('salary_selected_month');
   };
 
   const setMonthYear = (newYear: number, newMonth: number) => {
     setYear(newYear);
     setMonth(newMonth);
+    localStorage.setItem('salary_selected_year', String(newYear));
+    localStorage.setItem('salary_selected_month', String(newMonth));
   };
 
   // Fetch holidays from API
@@ -161,6 +173,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         exceptions,
         holidays,
         isLoadingHolidays,
+        isInitialized,
         calculationResult,
         setMonthYear,
         updateSettings,

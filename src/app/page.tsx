@@ -11,7 +11,7 @@ import { generateMonthlyBreakdown } from '../utils/salaryCalculator';
 import { exportMonthToCSV } from '../utils/csvExporter';
 
 export default function Home() {
-  const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult } = useSalary();
+  const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized } = useSalary();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -64,6 +64,14 @@ export default function Home() {
   const months = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
   const years = [2025, 2026, 2027];
+
+  if (!isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
