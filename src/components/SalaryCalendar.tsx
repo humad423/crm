@@ -20,6 +20,7 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
   const startOffset = firstDayOfWeekIndex === 0 ? 6 : firstDayOfWeekIndex - 1;
 
   const weekdays = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
+  const weekdaysShort = ['إث', 'ثل', 'أر', 'خم', 'جم', 'سب', 'أح'];
   const monthNames = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
   // Helper to format currency
@@ -52,9 +53,9 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Calendar Grid Section */}
-      <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm">
+    <div className="flex flex-col gap-8 w-full">
+      {/* Calendar Grid Section - Full Width */}
+      <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-lg">
@@ -64,20 +65,23 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
               تقويم شهر {monthNames[month]} / {year}
             </h2>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full">
+          <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 rounded-full">
             الدوام الافتراضي: 9س / إثنين-جمعة
           </span>
         </div>
 
         {/* Days of the Week Headers */}
-        <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
-          {weekdays.map((wd) => (
-            <div key={wd} className="py-2">{wd}</div>
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center text-xs font-semibold text-slate-400 dark:text-slate-500">
+          {weekdays.map((wd, idx) => (
+            <div key={wd} className="py-2">
+              <span className="hidden sm:inline">{wd}</span>
+              <span className="sm:hidden">{weekdaysShort[idx]}</span>
+            </div>
           ))}
         </div>
 
         {/* Calendar Days Grid */}
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {calendarCells.map((cell) => {
             if (!cell.day) {
               return (
@@ -132,11 +136,11 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
               <div
                 key={cell.key}
                 onClick={() => onSelectDate(dateStr)}
-                className={`relative aspect-square flex flex-col justify-between p-2 rounded-2xl border ${borderStyle} ${bgStyle} cursor-pointer group hover:scale-[1.02] hover:shadow-sm transition-all duration-200`}
+                className={`relative aspect-square flex flex-col justify-between p-1 sm:p-2 rounded-2xl border ${borderStyle} ${bgStyle} cursor-pointer group hover:scale-[1.02] hover:shadow-sm transition-all duration-200`}
               >
                 {/* Day Header: number & holiday name indicator */}
                 <div className="flex items-start justify-between">
-                  <span className={`text-sm font-bold ${textStyle}`}>
+                  <span className={`text-xs sm:text-sm font-bold ${textStyle}`}>
                     {day}
                   </span>
                   
@@ -147,56 +151,65 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
                         e.stopPropagation();
                         deleteExceptionByDate(dateStr);
                       }}
-                      className="hidden group-hover:block p-1 bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-500 rounded-md transition-colors"
+                      className="hidden sm:group-hover:block p-1 bg-slate-100 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-500 rounded-md transition-colors"
                       title="حذف الاستثناء"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3 h-3" />
                     </button>
                   )}
 
                   {isHoliday && !dayExceptions.length && (
-                    <span className="w-2 h-2 bg-purple-500 rounded-full" title={holiday.localName} />
+                    <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" title={holiday.localName} />
                   )}
                 </div>
 
                 {/* Holiday Label if present */}
                 {isHoliday && (
-                  <div className="absolute top-7 left-1 right-1 text-[9px] font-semibold text-purple-600 dark:text-purple-400 truncate bg-purple-100/50 dark:bg-purple-950/30 px-1 rounded text-center">
+                  <div className="absolute top-6 left-0.5 right-0.5 text-[8px] sm:text-[9px] font-semibold text-purple-600 dark:text-purple-400 truncate bg-purple-100/50 dark:bg-purple-950/30 px-1 rounded text-center">
                     {holiday.localName}
                   </div>
                 )}
 
                 {/* Day status display */}
-                <div className="flex flex-wrap gap-1 mt-auto">
+                <div className="flex flex-wrap gap-0.5 mt-auto w-full">
                   {absence && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-lg flex items-center gap-1 w-full justify-center">
-                      غياب كامل
+                    <span className="text-[10px] font-bold px-1 sm:px-1.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-lg flex items-center gap-1 w-full justify-center text-center">
+                      <span className="hidden sm:inline">غياب كامل</span>
+                      <span className="sm:hidden text-[9px]">غياب</span>
                     </span>
                   )}
                   {delay && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-lg flex items-center gap-1 w-full justify-center">
-                      تأخير {delay.hours}س
+                    <span className="text-[10px] font-bold px-1 sm:px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-lg flex items-center gap-1 w-full justify-center text-center">
+                      <span className="hidden sm:inline">تأخير {delay.hours}س</span>
+                      <span className="sm:hidden text-[9px]">-{delay.hours}س</span>
                     </span>
                   )}
                   {overtimes.map((ot, oIdx) => (
                     <span
                       key={oIdx}
-                      className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-lg flex items-center gap-1 w-full justify-center"
+                      className="text-[10px] font-bold px-1 sm:px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-lg flex items-center gap-1 w-full justify-center text-center"
                     >
-                      إضافي {ot.hours}س ({ot.overtimeType === 'weekday' ? 'مسائي' : ot.overtimeType === 'saturday' ? 'سبت' : ot.overtimeType === 'sunday' ? 'أحد' : 'عطلة'})
+                      <span className="hidden sm:inline">
+                        إضافي {ot.hours}س ({ot.overtimeType === 'weekday' ? 'مسائي' : ot.overtimeType === 'saturday' ? 'سبت' : ot.overtimeType === 'sunday' ? 'أحد' : 'عطلة'})
+                      </span>
+                      <span className="sm:hidden text-[9px]">
+                        +{ot.hours}س
+                      </span>
                     </span>
                   ))}
                   
                   {/* Default active display if no exception and regular work day */}
                   {!dayExceptions.length && !isWeekend && !isHoliday && (
                     <span className="text-[9px] text-slate-400 dark:text-slate-500 w-full text-center group-hover:text-slate-500">
-                      9 ساعات (تلقائي)
+                      <span className="hidden sm:inline">9 ساعات (تلقائي)</span>
+                      <span className="sm:hidden text-slate-450/70">9س</span>
                     </span>
                   )}
 
                   {!dayExceptions.length && isWeekend && !isHoliday && (
                     <span className="text-[9px] text-slate-450 dark:text-slate-550 w-full text-center">
-                      عطلة أسبوعية
+                      <span className="hidden sm:inline">عطلة أسبوعية</span>
+                      <span className="sm:hidden text-slate-450/50">عطلة</span>
                     </span>
                   )}
                 </div>
@@ -211,22 +224,23 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
         </div>
       </div>
 
-      {/* Right Column: Weekly Breakdown (Weekly Equalization / Denkleştirme) */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm flex flex-col">
-        <div className="flex items-center gap-3 mb-6">
+      {/* Weekly Breakdown (Weekly Equalization / Denkleştirme) - Bottom Section */}
+      <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-4">
           <div className="p-2 bg-amber-500/10 text-amber-600 rounded-lg">
             <ShieldAlert className="w-5 h-5" />
           </div>
           <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-            حساب المقاصة الأسبوعية
+            حساب المقاصة الأسبوعية (Denkleştirme)
           </h2>
         </div>
 
         <p className="text-xs text-slate-400 dark:text-slate-500 mb-6 leading-relaxed">
-          وفقاً لقانون العمل التركي، يتم ترحيل ساعات الغياب والتأخير لتغطية ساعات العمل الإضافية أولاً بمعدل (1x) حتى نصل للنصاب الأسبوعي (45 ساعة)، وما زاد عنها يُحتسب بمعامل الضرب (1.5x أو 2x).
+          وفقاً لقانون العمل التركي، يتم ترحيل ساعات الغياب والتأخير لتغطية ساعات العمل الإضافية أولاً بمعدل (1x) حتى نصل للنصاب الأسبوعي (45 ساعة)، وما زاد عنها يُحتسب بمعامل الضرب المعتمد (1.5x أو 2x).
         </p>
 
-        <div className="space-y-4 overflow-y-auto flex-1 max-h-[460px] pr-1">
+        {/* Horizontal scrollable or multi-column grid below calendar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {calculationResult.weeklyBreakdowns.map((week) => {
             const hasDeficit = week.deficitHours > 0;
             const hasOvertimes = (week.weekdayOvertimeHours + week.saturdayOvertimeHours + week.sundayHolidayOvertimeHours) > 0;
@@ -234,56 +248,57 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
             return (
               <div
                 key={week.weekIndex}
-                className={`p-4 rounded-xl border transition-colors ${
+                className={`p-4 rounded-xl border flex flex-col justify-between transition-colors ${
                   hasDeficit && hasOvertimes
                     ? 'border-amber-200 dark:border-amber-900/30 bg-amber-50/10 dark:bg-amber-950/5'
                     : 'border-slate-100 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-950/10'
                 }`}
               >
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    {week.weekLabel}
-                  </h3>
-                  {week.deficitHours > 0 ? (
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-md">
-                      نقص: {week.deficitHours} ساعات
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-md">
-                      اكتمل النصاب (45س)
-                    </span>
-                  )}
-                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-bold text-slate-700 dark:text-slate-350">
+                      {week.weekLabel}
+                    </h3>
+                    {week.deficitHours > 0 ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-md">
+                        نقص: {week.deficitHours}س
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-md">
+                        مكتمل (45س)
+                      </span>
+                    )}
+                  </div>
 
-                {/* Week Metrics Grid */}
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400 mb-3 border-b border-slate-50 dark:border-slate-800/50 pb-2">
-                  <div>دوام إثنين-جمعة: <span className="font-bold text-slate-700 dark:text-slate-350">{week.actualWeekdayHours}س / {week.expectedHours}س</span></div>
-                  <div>الغيابات: <span className="font-bold text-slate-700 dark:text-slate-350">{week.absenceDeductions} يوم</span></div>
-                  <div>التأخير: <span className="font-bold text-slate-700 dark:text-slate-350">{week.delayHours}س</span></div>
-                  <div>إجمالي الإضافي الفعلي: <span className="font-bold text-slate-700 dark:text-slate-350">{(week.weekdayOvertimeHours + week.saturdayOvertimeHours + week.sundayHolidayOvertimeHours)}س</span></div>
+                  {/* Week Metrics Grid */}
+                  <div className="grid grid-cols-1 gap-1 text-[11px] text-slate-450 dark:text-slate-450 mb-3 border-b border-slate-50 dark:border-slate-800/50 pb-2">
+                    <div>العمل: <span className="font-semibold text-slate-700 dark:text-slate-300">{week.actualWeekdayHours}س / {week.expectedHours}س</span></div>
+                    <div>الغياب: <span className="font-semibold text-slate-700 dark:text-slate-300">{week.absenceDeductions} يوم</span> | التأخير: <span className="font-semibold text-slate-700 dark:text-slate-300">{week.delayHours}س</span></div>
+                    <div>الإضافي الفعلي: <span className="font-semibold text-slate-750 dark:text-slate-300">{(week.weekdayOvertimeHours + week.saturdayOvertimeHours + week.sundayHolidayOvertimeHours)}س</span></div>
+                  </div>
                 </div>
 
                 {/* Equalization Output */}
-                <div className="space-y-1">
-                  <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                    نتائج المقاصة الأسبوعية:
+                <div className="space-y-1 mt-auto">
+                  <h4 className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                    النتائج المحتسبة:
                   </h4>
                   {week.overtimeHours1x > 0 && (
-                    <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400 font-semibold bg-amber-100/30 dark:bg-amber-950/20 px-2 py-0.5 rounded">
-                      <span>إضافي لتغطية النقص (1.0x):</span>
-                      <span>{week.overtimeHours1x} ساعة</span>
+                    <div className="flex justify-between text-[11px] text-amber-650 dark:text-amber-400 font-semibold bg-amber-100/30 dark:bg-amber-950/20 px-1.5 py-0.5 rounded">
+                      <span>لتغطية النقص (1.0x):</span>
+                      <span>{week.overtimeHours1x}س</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
-                    <span>إضافي بمعدل الضرب (1.5x):</span>
+                  <div className="flex justify-between text-[11px] text-slate-550 dark:text-slate-400">
+                    <span>إضافي بمعدل (1.5x):</span>
                     <span className={week.overtimeHours1_5x > 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : ''}>
-                      {week.overtimeHours1_5x} ساعة
+                      {week.overtimeHours1_5x}س
                     </span>
                   </div>
-                  <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
-                    <span>إضافي بمعدل الضرب (2.0x):</span>
+                  <div className="flex justify-between text-[11px] text-slate-550 dark:text-slate-400">
+                    <span>إضافي بمعدل (2.0x):</span>
                     <span className={week.overtimeHours2x > 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : ''}>
-                      {week.overtimeHours2x} ساعة
+                      {week.overtimeHours2x}س
                     </span>
                   </div>
                 </div>
