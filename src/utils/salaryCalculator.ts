@@ -84,6 +84,7 @@ export function generateMonthlyBreakdown(
     let weekdayOvertimeHours = 0;
     let saturdayOvertimeHours = 0;
     let sundayHolidayOvertimeHours = 0;
+    let flatOvertimeHours = 0;
 
     if (isScheduledWeekday) {
       if (isAbsent) {
@@ -92,37 +93,41 @@ export function generateMonthlyBreakdown(
         // Delay reduces standard hours worked
         actualWeekdayHoursWorked = Math.max(0, defaultScheduledHours - delayHours);
       }
-
-      // Add weekday overtime
-      const weekdayOt = overtimeEvents.find((e) => e.overtimeType === 'weekday');
-      if (weekdayOt?.hours) {
-        weekdayOvertimeHours = weekdayOt.hours;
-      }
     } else {
       // Weekend: no standard scheduled hours
       actualWeekdayHoursWorked = 0;
     }
 
-    // Weekend or holiday overtime
-    if (isHoliday) {
-      // Any work on public holiday is holiday overtime (2x)
-      const holidayOt = overtimeEvents.find((e) => e.overtimeType === 'holiday' || e.overtimeType === 'weekday' || e.overtimeType === 'saturday' || e.overtimeType === 'sunday');
-      if (holidayOt?.hours) {
-        sundayHolidayOvertimeHours = holidayOt.hours;
-      }
-    } else {
-      if (dayOfWeek === 6) { // Saturday
-        const satOt = overtimeEvents.find((e) => e.overtimeType === 'saturday');
-        if (satOt?.hours) {
-          saturdayOvertimeHours = satOt.hours;
-        }
-      } else if (dayOfWeek === 0) { // Sunday
-        const sunOt = overtimeEvents.find((e) => e.overtimeType === 'sunday');
-        if (sunOt?.hours) {
-          sundayHolidayOvertimeHours = sunOt.hours;
+    // Process overtime events using custom multiplier override if present
+    overtimeEvents.forEach((ot) => {
+      let mult = ot.multiplier;
+      if (mult === undefined) {
+        // Fallback to default multipliers
+        if (ot.overtimeType === 'holiday' || isHoliday) {
+          mult = 1.0;
+        } else if (ot.overtimeType === 'sunday' || dayOfWeek === 0) {
+          mult = 2.0;
+        } else if (ot.overtimeType === 'saturday' || dayOfWeek === 6) {
+          mult = 1.5;
+        } else {
+          mult = 1.5;
         }
       }
-    }
+
+      const hoursVal = ot.hours || 0;
+      if (mult === 2.0) {
+        sundayHolidayOvertimeHours += hoursVal;
+      } else if (mult === 1.5) {
+        if (ot.overtimeType === 'saturday' || dayOfWeek === 6) {
+          saturdayOvertimeHours += hoursVal;
+        } else {
+          weekdayOvertimeHours += hoursVal;
+        }
+      } else {
+        // 1.0x or other custom multipliers
+        flatOvertimeHours += hoursVal;
+      }
+    });
 
     breakdowns.push({
       date: dateStr,
@@ -136,6 +141,7 @@ export function generateMonthlyBreakdown(
       weekdayOvertimeHours,
       saturdayOvertimeHours,
       sundayHolidayOvertimeHours,
+      flatOvertimeHours,
     });
   }
 
@@ -195,6 +201,7 @@ export function calculateWeeklyEqualization(
     let weekdayOvertimeHours = 0;
     let saturdayOvertimeHours = 0;
     let sundayHolidayOvertimeHours = 0;
+    let flatOvertimeHours = 0;
 
     days.forEach((day) => {
       expectedHours += day.defaultScheduledHours;
@@ -204,6 +211,7 @@ export function calculateWeeklyEqualization(
       weekdayOvertimeHours += day.weekdayOvertimeHours;
       saturdayOvertimeHours += day.saturdayOvertimeHours;
       sundayHolidayOvertimeHours += day.sundayHolidayOvertimeHours;
+      flatOvertimeHours += day.flatOvertimeHours || 0;
     });
 
     // Weekly Equalization (Denkleştirme) Logic:
@@ -219,23 +227,32 @@ export function calculateWeeklyEqualization(
       // No deficit! Standard multipliers apply directly.
       overtimeHours1_5x = weekdayOvertimeHours + saturdayOvertimeHours;
       overtimeHours2x = sundayHolidayOvertimeHours;
+      overtimeHours1x = flatOvertimeHours;
     } else {
       // We have a deficit! We must use overtime/weekend hours to cover it.
       // Pool of overtime hours, divided by multipliers:
+      // 1.0x Pool: Flat holiday / manually overridden 1.0x hours
       // 1.5x Pool: Weekday evening overtime + Saturday hours
-      // 2.0x Pool: Sunday + Holiday hours
+      // 2.0x Pool: Sunday + Holiday hours (that are 2x)
+      let pool1_0x = flatOvertimeHours;
       let pool1_5x = weekdayOvertimeHours + saturdayOvertimeHours;
       let pool2_0x = sundayHolidayOvertimeHours;
 
       let remainingDeficit = deficitHours;
 
-      // 1. First cover deficit using 1.5x pool (cheaper multiplier for employer, fairer prioritization)
+      // 1. First cover deficit using 1.0x pool (cheapest and already 1.0x!)
+      const usedFrom1_0x = Math.min(remainingDeficit, pool1_0x);
+      overtimeHours1x += usedFrom1_0x;
+      pool1_0x -= usedFrom1_0x;
+      remainingDeficit -= usedFrom1_0x;
+
+      // 2. Cover remaining deficit using 1.5x pool
       const usedFrom1_5x = Math.min(remainingDeficit, pool1_5x);
       overtimeHours1x += usedFrom1_5x;
       pool1_5x -= usedFrom1_5x;
       remainingDeficit -= usedFrom1_5x;
 
-      // 2. If there is still deficit, cover using 2.0x pool
+      // 3. Cover remaining deficit using 2.0x pool
       const usedFrom2_0x = Math.min(remainingDeficit, pool2_0x);
       overtimeHours1x += usedFrom2_0x;
       pool2_0x -= usedFrom2_0x;
@@ -244,6 +261,9 @@ export function calculateWeeklyEqualization(
       // Remaining pools are paid at their premium rate
       overtimeHours1_5x = pool1_5x;
       overtimeHours2x = pool2_0x;
+      
+      // Leftover 1.0x hours are paid at 1.0x rate
+      overtimeHours1x += pool1_0x;
     }
 
     return {

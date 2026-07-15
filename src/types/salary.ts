@@ -8,6 +8,7 @@ export interface ExceptionEvent {
   type: ExceptionType;
   hours?: number; // Needed for delay and overtime
   overtimeType?: OvertimeType; // Needed for overtime
+  multiplier?: number; // Custom overtime multiplier override (1, 1.5, 2)
   note?: string;
 }
 
@@ -38,6 +39,7 @@ export interface DayBreakdown {
   weekdayOvertimeHours: number;
   saturdayOvertimeHours: number;
   sundayHolidayOvertimeHours: number;
+  flatOvertimeHours: number;
 }
 
 export interface WeeklyBreakdown {

@@ -14,6 +14,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
   const [eventType, setEventType] = useState<ExceptionType>('overtime');
   const [hours, setHours] = useState<number>(3);
   const [overtimeType, setOvertimeType] = useState<OvertimeType>('weekday');
+  const [multiplier, setMultiplier] = useState<number>(1.5);
   const [note, setNote] = useState<string>('');
 
   // Find if there is an existing exception for this date
@@ -47,10 +48,18 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
         setEventType(primary.type);
         setHours(primary.hours || (autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 3));
         setOvertimeType(primary.overtimeType || autoOtType);
+        
+        let initialMult = primary.multiplier;
+        if (initialMult === undefined) {
+          const typeToCheck = primary.overtimeType || autoOtType;
+          initialMult = typeToCheck === 'holiday' ? 1.0 : (typeToCheck === 'sunday' ? 2.0 : 1.5);
+        }
+        setMultiplier(initialMult);
         setNote(primary.note || '');
       } else {
         setEventType('overtime');
         setHours(autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 3);
+        setMultiplier(autoOtType === 'holiday' ? 1.0 : (autoOtType === 'sunday' ? 2.0 : 1.5));
         setNote('');
       }
     }
@@ -77,6 +86,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
       type: eventType,
       hours: eventType === 'absence' ? undefined : Number(hours),
       overtimeType: eventType === 'overtime' ? overtimeType : undefined,
+      multiplier: eventType === 'overtime' ? Number(multiplier) : undefined,
       note: note.trim() || undefined,
     });
     
@@ -183,6 +193,8 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
                       onClick={() => {
                         setOvertimeType(ot.value as OvertimeType);
                         setHours(ot.defaultHours);
+                        const defaultMult = ot.value === 'holiday' ? 1.0 : (ot.value === 'sunday' ? 2.0 : 1.5);
+                        setMultiplier(defaultMult);
                       }}
                       className={`py-2 px-3 text-xs font-semibold rounded-xl border text-center transition-all ${
                         overtimeType === ot.value
@@ -191,6 +203,33 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
                       }`}
                     >
                       {ot.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Overtime Multiplier */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider block">
+                  مضاعف ساعات العمل الإضافي (Multiplier)
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 1.0, label: 'x1.0' },
+                    { value: 1.5, label: 'x1.5' },
+                    { value: 2.0, label: 'x2.0' },
+                  ].map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => setMultiplier(m.value)}
+                      className={`py-2 px-3 text-xs font-bold rounded-xl border text-center transition-all ${
+                        multiplier === m.value
+                          ? 'border-indigo-500 bg-indigo-500/10 text-indigo-655 dark:text-indigo-400'
+                          : 'border-slate-150 dark:border-slate-800 text-slate-550 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-850/30'
+                      }`}
+                    >
+                      {m.label}
                     </button>
                   ))}
                 </div>

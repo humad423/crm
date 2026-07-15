@@ -128,6 +128,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           type: e.type as any,
           hours: e.hours ? Number(e.hours) : undefined,
           overtimeType: e.overtime_type as any,
+          multiplier: e.multiplier ? Number(e.multiplier) : undefined,
           note: e.note || undefined,
         }));
         setExceptions(mappedExceptions);
@@ -204,6 +205,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
             type: e.type,
             hours: e.hours,
             overtime_type: e.overtimeType,
+            multiplier: e.multiplier,
             note: e.note || '',
           }));
           await supabase.from('exceptions').insert(dbExceptions);
@@ -284,6 +286,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           type: eventInput.type,
           hours: eventInput.hours,
           overtime_type: eventInput.overtimeType,
+          multiplier: eventInput.multiplier,
           note: eventInput.note || '',
         })
         .select()
@@ -296,6 +299,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           type: data.type as any,
           hours: data.hours ? Number(data.hours) : undefined,
           overtimeType: data.overtime_type as any,
+          multiplier: data.multiplier ? Number(data.multiplier) : undefined,
           note: data.note || undefined,
         };
 
