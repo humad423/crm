@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserSettings, ExceptionEvent, Holiday, MonthlyCalculationResult } from '../types/salary';
 import { calculateMonthlySalary } from '../utils/salaryCalculator';
+import { supabase } from '../utils/supabaseClient';
+import { User } from '@supabase/supabase-js';
 
 interface SalaryContextType {
   year: number;
@@ -12,13 +14,17 @@ interface SalaryContextType {
   holidays: Holiday[];
   isLoadingHolidays: boolean;
   isInitialized: boolean;
+  user: User | null;
   calculationResult: MonthlyCalculationResult;
   setMonthYear: (year: number, month: number) => void;
-  updateSettings: (settings: Partial<UserSettings>) => void;
-  addException: (event: Omit<ExceptionEvent, 'id'>) => void;
-  deleteException: (id: string) => void;
-  deleteExceptionByDate: (dateStr: string) => void;
-  clearAllData: () => void;
+  updateSettings: (settings: Partial<UserSettings>) => Promise<void>;
+  addException: (event: Omit<ExceptionEvent, 'id'>) => Promise<void>;
+  deleteException: (id: string) => Promise<void>;
+  deleteExceptionByDate: (dateStr: string) => Promise<void>;
+  clearAllData: () => Promise<void>;
+  login: (username: string, password: string) => Promise<{ error: any }>;
+  signup: (username: string, password: string) => Promise<{ error: any }>;
+  logout: () => Promise<void>;
 }
 
 const defaultSettings: UserSettings = {
@@ -33,7 +39,6 @@ const defaultSettings: UserSettings = {
 const SalaryContext = createContext<SalaryContextType | undefined>(undefined);
 
 export function SalaryProvider({ children }: { children: ReactNode }) {
-  // Initialize with local date dynamically
   const [year, setYear] = useState<number>(() => new Date().getFullYear());
   const [month, setMonth] = useState<number>(() => new Date().getMonth()); // 0-based
   
@@ -42,89 +47,315 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [isLoadingHolidays, setIsLoadingHolidays] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [user, setUser] = useState<User | null>(null);
 
-  // Load from LocalStorage on mount
+  // 1. Listen to Auth Changes and load session on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const today = new Date();
-      let initialYear = today.getFullYear();
-      let initialMonth = today.getMonth();
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
 
-      const savedYear = localStorage.getItem('salary_selected_year');
-      const savedMonth = localStorage.getItem('salary_selected_month');
-      if (savedYear) initialYear = Number(savedYear);
-      if (savedMonth) initialMonth = Number(savedMonth);
-      
-      setYear(initialYear);
-      setMonth(initialMonth);
+      // Restore month/year selection from LocalStorage
+      if (typeof window !== 'undefined') {
+        const today = new Date();
+        let initialYear = today.getFullYear();
+        let initialMonth = today.getMonth();
 
-      const savedSettings = localStorage.getItem('salary_settings');
-      if (savedSettings) {
-        try {
-          setSettings(JSON.parse(savedSettings));
-        } catch (e) {
-          console.error('Error loading settings', e);
-        }
-      }
-      
-      const savedExceptions = localStorage.getItem('salary_exceptions');
-      if (savedExceptions) {
-        try {
-          setExceptions(JSON.parse(savedExceptions));
-        } catch (e) {
-          console.error('Error loading exceptions', e);
-        }
+        const savedYear = localStorage.getItem('salary_selected_year');
+        const savedMonth = localStorage.getItem('salary_selected_month');
+        if (savedYear) initialYear = Number(savedYear);
+        if (savedMonth) initialMonth = Number(savedMonth);
+        
+        setYear(initialYear);
+        setMonth(initialMonth);
       }
       setIsInitialized(true);
-    }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Save Settings to LocalStorage
-  const updateSettings = (newSettings: Partial<UserSettings>) => {
-    setSettings((prev) => {
-      const updated = { ...prev, ...newSettings };
-      localStorage.setItem('salary_settings', JSON.stringify(updated));
-      return updated;
-    });
-  };
+  // 2. Fetch User Data (Settings & Exceptions) from Supabase on Login, or LocalStorage on Logout
+  const fetchUserData = async (userId: string) => {
+    try {
+      // A. Fetch Settings
+      const { data: settingsData, error: settingsErr } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-  // Save Exceptions to LocalStorage
-  const saveExceptions = (newExceptions: ExceptionEvent[]) => {
-    setExceptions(newExceptions);
-    localStorage.setItem('salary_exceptions', JSON.stringify(newExceptions));
-  };
+      if (settingsData) {
+        setSettings({
+          baseSalary: Number(settingsData.base_salary),
+          standardWeeklyHours: Number(settingsData.standard_weekly_hours),
+          defaultDailyHours: Number(settingsData.default_daily_hours),
+          multiplierWeekdaySat: Number(settingsData.multiplier_weekday_sat),
+          multiplierSundayHoliday: Number(settingsData.multiplier_sunday_holiday),
+          googleApiKey: settingsData.google_api_key || '',
+        });
+      } else {
+        // Insert defaults if none exist
+        await supabase.from('user_settings').insert({
+          user_id: userId,
+          base_salary: settings.baseSalary,
+          standard_weekly_hours: settings.standardWeeklyHours,
+          default_daily_hours: settings.defaultDailyHours,
+          multiplier_weekday_sat: settings.multiplierWeekdaySat,
+          multiplier_sunday_holiday: settings.multiplierSundayHoliday,
+          google_api_key: settings.googleApiKey,
+        });
+      }
 
-  const addException = (eventInput: Omit<ExceptionEvent, 'id'>) => {
-    const newEvent: ExceptionEvent = {
-      ...eventInput,
-      id: Math.random().toString(36).substring(2, 9),
-    };
-    
-    // Check if there is already an exception of the same type or a conflicting event on the same day.
-    // Under our simplified tool, we can allow multiple overtime events, but for absence/delay, it's typically one per day.
-    // Let's filter out existing absence/delay on the same date to avoid conflicts.
-    let filtered = exceptions;
-    if (newEvent.type === 'absence' || newEvent.type === 'delay') {
-      filtered = exceptions.filter((e) => !(e.date === newEvent.date && (e.type === 'absence' || e.type === 'delay')));
-    } else if (newEvent.type === 'overtime') {
-      // Overtime of the same sub-type on the same day is replaced
-      filtered = exceptions.filter((e) => !(e.date === newEvent.date && e.type === 'overtime' && e.overtimeType === newEvent.overtimeType));
+      // B. Fetch Exceptions
+      const { data: exceptionsData, error: exceptionsErr } = await supabase
+        .from('exceptions')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (exceptionsData) {
+        const mappedExceptions: ExceptionEvent[] = exceptionsData.map((e) => ({
+          id: e.id,
+          date: e.date,
+          type: e.type as any,
+          hours: e.hours ? Number(e.hours) : undefined,
+          overtimeType: e.overtime_type as any,
+          note: e.note || undefined,
+        }));
+        setExceptions(mappedExceptions);
+      }
+    } catch (err) {
+      console.error('Error fetching user data:', err);
     }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchUserData(user.id);
+    } else {
+      // Load Offline Local Storage Fallback
+      if (typeof window !== 'undefined') {
+        const savedSettings = localStorage.getItem('salary_settings');
+        if (savedSettings) {
+          try { setSettings(JSON.parse(savedSettings)); } catch (e) {}
+        } else {
+          setSettings(defaultSettings);
+        }
+        
+        const savedExceptions = localStorage.getItem('salary_exceptions');
+        if (savedExceptions) {
+          try { setExceptions(JSON.parse(savedExceptions)); } catch (e) {}
+        } else {
+          setExceptions([]);
+        }
+      }
+    }
+  }, [user]);
+
+  // Helper to format Username to Email
+  const getEmailFromUsername = (username: string) => {
+    return `${username.trim().toLowerCase()}@factory.com`;
+  };
+
+  // 3. Authentication Functions
+  const login = async (username: string, password: string) => {
+    const email = getEmailFromUsername(username);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error };
+  };
+
+  const signup = async (username: string, password: string) => {
+    const email = getEmailFromUsername(username);
     
-    saveExceptions([...filtered, newEvent]);
+    // Register
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    
+    if (error) return { error };
+    
+    if (data.user) {
+      const newUserId = data.user.id;
+      
+      // Migrate existing local storage exceptions and settings to Supabase
+      try {
+        // A. Migrate settings
+        await supabase.from('user_settings').upsert({
+          user_id: newUserId,
+          base_salary: settings.baseSalary,
+          standard_weekly_hours: settings.standardWeeklyHours,
+          default_daily_hours: settings.defaultDailyHours,
+          multiplier_weekday_sat: settings.multiplierWeekdaySat,
+          multiplier_sunday_holiday: settings.multiplierSundayHoliday,
+          google_api_key: settings.googleApiKey,
+        });
+
+        // B. Migrate exceptions
+        if (exceptions.length > 0) {
+          const dbExceptions = exceptions.map((e) => ({
+            user_id: newUserId,
+            date: e.date,
+            type: e.type,
+            hours: e.hours,
+            overtime_type: e.overtimeType,
+            note: e.note || '',
+          }));
+          await supabase.from('exceptions').insert(dbExceptions);
+        }
+
+        // C. Clear local storage offline keys
+        localStorage.removeItem('salary_settings');
+        localStorage.removeItem('salary_exceptions');
+      } catch (migrationErr) {
+        console.error('Local data migration failed:', migrationErr);
+      }
+    }
+
+    return { error: null };
   };
 
-  const deleteException = (id: string) => {
-    saveExceptions(exceptions.filter((e) => e.id !== id));
+  const logout = async () => {
+    await supabase.auth.signOut();
   };
 
-  const deleteExceptionByDate = (dateStr: string) => {
-    saveExceptions(exceptions.filter((e) => e.date !== dateStr));
+  // 4. Data Mutation Functions (Sync to DB if logged in, otherwise LocalStorage)
+  const updateSettings = async (newSettings: Partial<UserSettings>) => {
+    const updated = { ...settings, ...newSettings };
+    setSettings(updated);
+
+    if (user) {
+      // Sync to Supabase
+      await supabase.from('user_settings').upsert({
+        user_id: user.id,
+        base_salary: updated.baseSalary,
+        standard_weekly_hours: updated.standardWeeklyHours,
+        default_daily_hours: updated.defaultDailyHours,
+        multiplier_weekday_sat: updated.multiplierWeekdaySat,
+        multiplier_sunday_holiday: updated.multiplierSundayHoliday,
+        google_api_key: updated.googleApiKey,
+        updated_at: new Date().toISOString(),
+      });
+    } else {
+      // Save locally
+      localStorage.setItem('salary_settings', JSON.stringify(updated));
+    }
   };
 
-  const clearAllData = () => {
-    saveExceptions([]);
+  const addException = async (eventInput: Omit<ExceptionEvent, 'id'>) => {
+    // Determine conflicting filters
+    let conflictFilter = (e: ExceptionEvent) => true;
+    if (eventInput.type === 'absence' || eventInput.type === 'delay') {
+      conflictFilter = (e) => e.date === eventInput.date && (e.type === 'absence' || e.type === 'delay');
+    } else if (eventInput.type === 'overtime') {
+      conflictFilter = (e) => e.date === eventInput.date && e.type === 'overtime' && e.overtimeType === eventInput.overtimeType;
+    }
+
+    if (user) {
+      // Delete conflicts in Supabase first
+      if (eventInput.type === 'absence' || eventInput.type === 'delay') {
+        await supabase
+          .from('exceptions')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('date', eventInput.date)
+          .in('type', ['absence', 'delay']);
+      } else if (eventInput.type === 'overtime') {
+        await supabase
+          .from('exceptions')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('date', eventInput.date)
+          .eq('type', 'overtime')
+          .eq('overtime_type', eventInput.overtimeType || 'weekday');
+      }
+
+      // Insert new exception into Supabase
+      const { data, error } = await supabase
+        .from('exceptions')
+        .insert({
+          user_id: user.id,
+          date: eventInput.date,
+          type: eventInput.type,
+          hours: eventInput.hours,
+          overtime_type: eventInput.overtimeType,
+          note: eventInput.note || '',
+        })
+        .select()
+        .single();
+
+      if (data) {
+        const newEvent: ExceptionEvent = {
+          id: data.id,
+          date: data.date,
+          type: data.type as any,
+          hours: data.hours ? Number(data.hours) : undefined,
+          overtimeType: data.overtime_type as any,
+          note: data.note || undefined,
+        };
+
+        // Filter local state and append
+        setExceptions((prev) => [...prev.filter((e) => !conflictFilter(e)), newEvent]);
+      }
+    } else {
+      // Local offline mode
+      const newEvent: ExceptionEvent = {
+        ...eventInput,
+        id: Math.random().toString(36).substring(2, 9),
+      };
+      
+      const filtered = exceptions.filter((e) => !conflictFilter(e));
+      const updated = [...filtered, newEvent];
+      setExceptions(updated);
+      localStorage.setItem('salary_exceptions', JSON.stringify(updated));
+    }
+  };
+
+  const deleteException = async (id: string) => {
+    if (user) {
+      await supabase.from('exceptions').delete().eq('user_id', user.id).eq('id', id);
+      setExceptions((prev) => prev.filter((e) => e.id !== id));
+    } else {
+      const updated = exceptions.filter((e) => e.id !== id);
+      setExceptions(updated);
+      localStorage.setItem('salary_exceptions', JSON.stringify(updated));
+    }
+  };
+
+  const deleteExceptionByDate = async (dateStr: string) => {
+    if (user) {
+      await supabase.from('exceptions').delete().eq('user_id', user.id).eq('date', dateStr);
+      setExceptions((prev) => prev.filter((e) => e.date !== dateStr));
+    } else {
+      const updated = exceptions.filter((e) => e.date !== dateStr);
+      setExceptions(updated);
+      localStorage.setItem('salary_exceptions', JSON.stringify(updated));
+    }
+  };
+
+  const clearAllData = async () => {
+    if (user) {
+      // Clear Supabase exceptions & reset settings
+      await supabase.from('exceptions').delete().eq('user_id', user.id);
+      await supabase.from('user_settings').upsert({
+        user_id: user.id,
+        base_salary: defaultSettings.baseSalary,
+        standard_weekly_hours: defaultSettings.standardWeeklyHours,
+        default_daily_hours: defaultSettings.defaultDailyHours,
+        multiplier_weekday_sat: defaultSettings.multiplierWeekdaySat,
+        multiplier_sunday_holiday: defaultSettings.multiplierSundayHoliday,
+        google_api_key: '',
+      });
+    }
+
     setSettings(defaultSettings);
+    setExceptions([]);
+    
     localStorage.removeItem('salary_settings');
     localStorage.removeItem('salary_exceptions');
     localStorage.removeItem('salary_selected_year');
@@ -138,7 +369,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('salary_selected_month', String(newMonth));
   };
 
-  // Fetch holidays from API
+  // 5. Fetch Holidays from Calendar API
   useEffect(() => {
     const fetchHolidays = async () => {
       setIsLoadingHolidays(true);
@@ -161,7 +392,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     fetchHolidays();
   }, [year, settings.googleApiKey]);
 
-  // Calculate salary details
+  // Calculate salary breakdowns
   const calculationResult = calculateMonthlySalary(year, month, settings, exceptions, holidays);
 
   return (
@@ -174,6 +405,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         holidays,
         isLoadingHolidays,
         isInitialized,
+        user,
         calculationResult,
         setMonthYear,
         updateSettings,
@@ -181,6 +413,9 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         deleteException,
         deleteExceptionByDate,
         clearAllData,
+        login,
+        signup,
+        logout,
       }}
     >
       {children}

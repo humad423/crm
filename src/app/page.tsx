@@ -6,12 +6,13 @@ import MetricCards from '../components/MetricCards';
 import SalaryCalendar from '../components/SalaryCalendar';
 import SettingsPanel from '../components/SettingsPanel';
 import ExceptionModal from '../components/ExceptionModal';
-import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download } from 'lucide-react';
+import AuthScreen from '../components/AuthScreen';
+import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download, LogOut } from 'lucide-react';
 import { generateMonthlyBreakdown } from '../utils/salaryCalculator';
 import { exportMonthToCSV } from '../utils/csvExporter';
 
 export default function Home() {
-  const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized } = useSalary();
+  const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized, user, logout } = useSalary();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -73,6 +74,10 @@ export default function Home() {
     );
   }
 
+  if (!user) {
+    return <AuthScreen />;
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       
@@ -108,14 +113,28 @@ export default function Home() {
 
             {/* Settings Trigger */}
             <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
-              title="تعديل الإعدادات والرواتب"
-            >
-              <SettingsIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">الإعدادات</span>
-            </button>
-          </div>
+               onClick={() => setIsSettingsOpen(true)}
+               className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
+               title="تعديل الإعدادات والرواتب"
+             >
+               <SettingsIcon className="w-4 h-4" />
+               <span className="hidden sm:inline">الإعدادات</span>
+             </button>
+
+             {/* User display & Logout */}
+             <div className="flex items-center gap-1.5 sm:gap-2 border-r border-slate-100 dark:border-slate-800/80 pr-2 sm:pr-4 mr-1 sm:mr-2">
+               <span className="hidden md:inline text-xs font-bold text-slate-500 dark:text-slate-400">
+                 مرحباً، {user?.email?.split('@')[0]}
+               </span>
+               <button
+                 onClick={() => logout()}
+                 className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all"
+                 title="تسجيل الخروج"
+               >
+                 <LogOut className="w-5 h-5" />
+               </button>
+             </div>
+           </div>
         </div>
       </header>
 
