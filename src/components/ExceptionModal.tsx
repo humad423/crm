@@ -28,26 +28,28 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
       const dayVal = date.getDay(); // 0 = Sunday, 6 = Saturday, 1-5 = Weekday
       
       // Auto-set Overtime Type based on day of week / holiday status
+      let autoOtType: OvertimeType = 'weekday';
       if (isHoliday) {
-        setOvertimeType('holiday');
+        autoOtType = 'holiday';
       } else if (dayVal === 6) {
-        setOvertimeType('saturday');
+        autoOtType = 'saturday';
       } else if (dayVal === 0) {
-        setOvertimeType('sunday');
+        autoOtType = 'sunday';
       } else {
-        setOvertimeType('weekday');
+        autoOtType = 'weekday';
       }
+      setOvertimeType(autoOtType);
 
       // If there's an existing exception, populate the inputs
       if (existingExceptions.length > 0) {
         const primary = existingExceptions[0];
         setEventType(primary.type);
-        setHours(primary.hours || 2);
-        setOvertimeType(primary.overtimeType || 'weekday');
+        setHours(primary.hours || (autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 2));
+        setOvertimeType(primary.overtimeType || autoOtType);
         setNote(primary.note || '');
       } else {
         setEventType('overtime');
-        setHours(2);
+        setHours(autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 2);
         setNote('');
       }
     }
@@ -169,15 +171,18 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: 'weekday', label: 'مسائي (إثنين - جمعة)' },
-                    { value: 'saturday', label: 'يوم السبت' },
-                    { value: 'sunday', label: 'يوم الأحد' },
-                    { value: 'holiday', label: 'عطلة رسمية' },
+                    { value: 'weekday', label: 'مسائي (إثنين - جمعة)', defaultHours: 2 },
+                    { value: 'saturday', label: 'يوم السبت', defaultHours: 8 },
+                    { value: 'sunday', label: 'يوم الأحد', defaultHours: 8 },
+                    { value: 'holiday', label: 'عطلة رسمية', defaultHours: 8 },
                   ].map((ot) => (
                     <button
                       key={ot.value}
                       type="button"
-                      onClick={() => setOvertimeType(ot.value as OvertimeType)}
+                      onClick={() => {
+                        setOvertimeType(ot.value as OvertimeType);
+                        setHours(ot.defaultHours);
+                      }}
                       className={`py-2 px-3 text-xs font-semibold rounded-xl border text-center transition-all ${
                         overtimeType === ot.value
                           ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-405'
@@ -209,32 +214,71 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
                   />
                   <span className="text-sm font-bold text-slate-500 dark:text-slate-400">ساعة</span>
                 </div>
-                {overtimeType === 'saturday' && (
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setHours(8)}
-                      className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
-                        hours === 8
-                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                          : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850/30'
-                      }`}
-                    >
-                      8 ساعات (حتى 16:30)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHours(9)}
-                      className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
-                        hours === 9
-                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                          : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850/30'
-                      }`}
-                    >
-                      9 ساعات (حتى 17:30)
-                    </button>
-                  </div>
-                )}
+                {/* Quick-select hours shortcuts */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {overtimeType === 'saturday' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setHours(8)}
+                        className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
+                          hours === 8
+                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850/30'
+                        }`}
+                      >
+                        8 ساعات (حتى 16:30)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHours(9)}
+                        className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
+                          hours === 9
+                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850/30'
+                        }`}
+                      >
+                        9 ساعات (حتى 17:30)
+                      </button>
+                    </>
+                  )}
+                  {(overtimeType === 'sunday' || overtimeType === 'holiday') && (
+                    <>
+                      {[8, 9, 10, 12].map((h) => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setHours(h)}
+                          className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
+                            hours === h
+                              ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                              : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850/30'
+                          }`}
+                        >
+                          {h} ساعات
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {overtimeType === 'weekday' && (
+                    <>
+                      {[2, 3, 4].map((h) => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setHours(h)}
+                          className={`px-3 py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
+                            hours === h
+                              ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                              : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850/30'
+                          }`}
+                        >
+                          {h} ساعات
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}
