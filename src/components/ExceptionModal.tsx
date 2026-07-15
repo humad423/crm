@@ -12,7 +12,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
   const { exceptions, addException, deleteExceptionByDate, holidays } = useSalary();
   
   const [eventType, setEventType] = useState<ExceptionType>('overtime');
-  const [hours, setHours] = useState<number>(8);
+  const [hours, setHours] = useState<number>(3);
   const [overtimeType, setOvertimeType] = useState<OvertimeType>('weekday');
   const [note, setNote] = useState<string>('');
 
@@ -45,12 +45,12 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
       if (existingExceptions.length > 0) {
         const primary = existingExceptions[0];
         setEventType(primary.type);
-        setHours(primary.hours || 8);
+        setHours(primary.hours || (autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 3));
         setOvertimeType(primary.overtimeType || autoOtType);
         setNote(primary.note || '');
       } else {
         setEventType('overtime');
-        setHours(8);
+        setHours(autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 3);
         setNote('');
       }
     }
@@ -172,17 +172,17 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: 'weekday', label: 'مسائي (إثنين - جمعة)' },
-                    { value: 'saturday', label: 'يوم السبت' },
-                    { value: 'sunday', label: 'يوم الأحد' },
-                    { value: 'holiday', label: 'عطلة رسمية' },
+                    { value: 'weekday', label: 'مسائي (إثنين - جمعة)', defaultHours: 3 },
+                    { value: 'saturday', label: 'يوم السبت', defaultHours: 8 },
+                    { value: 'sunday', label: 'يوم الأحد', defaultHours: 8 },
+                    { value: 'holiday', label: 'عطلة رسمية', defaultHours: 8 },
                   ].map((ot) => (
                     <button
                       key={ot.value}
                       type="button"
                       onClick={() => {
                         setOvertimeType(ot.value as OvertimeType);
-                        setHours(8);
+                        setHours(ot.defaultHours);
                       }}
                       className={`py-2 px-3 text-xs font-semibold rounded-xl border text-center transition-all ${
                         overtimeType === ot.value
