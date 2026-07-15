@@ -1,4 +1,5 @@
 'use client';
+// Build trigger comment to apply Vercel environment variables
 
 import React, { useState, useEffect } from 'react';
 import { useSalary } from '../context/SalaryContext';
