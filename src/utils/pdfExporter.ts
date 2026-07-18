@@ -25,6 +25,26 @@ export function exportMonthToPDF(
   const totalDeductions = calculationResult.totalAbsenceDeduction + calculationResult.totalDelayDeduction;
   const totalOvertimeHours = calculationResult.overtime1xHours + calculationResult.overtime1_5xHours + calculationResult.overtime2xHours;
 
+  const isCustomSalary = calculationResult.customMonthSalary !== undefined;
+  const remaining = calculationResult.remainingBalance;
+
+  let remainingTitle = 'الرصيد المتبقي (مستوفى)';
+  let remainingBg = '#f8fafc';
+  let remainingBorder = '#e2e8f0';
+  let remainingTextColor = '#0f172a';
+  
+  if (remaining > 0) {
+    remainingTitle = 'الرصيد المتبقي (لك)';
+    remainingBg = '#f0fdf4';
+    remainingBorder = '#6ee7b7';
+    remainingTextColor = '#15803d';
+  } else if (remaining < 0) {
+    remainingTitle = 'الرصيد المتبقي (عليك)';
+    remainingBg = '#fef2f2';
+    remainingBorder = '#fca5a5';
+    remainingTextColor = '#b91c1c';
+  }
+
   // Create iframe
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
@@ -99,6 +119,30 @@ export function exportMonthToPDF(
     `;
   });
 
+  // Generate Payments list HTML rows
+  let paymentsRowsHtml = '';
+  const paymentsList = calculationResult.currentMonthPayments || [];
+  if (paymentsList.length === 0) {
+    paymentsRowsHtml = `
+      <tr>
+        <td colspan="3" style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 11px;">
+          لا توجد أي سُلف أو دفعات مسجلة لهذا الشهر.
+        </td>
+      </tr>
+    `;
+  } else {
+    paymentsList.forEach((p) => {
+      const [y, m, d] = p.date.split('-').map(Number);
+      paymentsRowsHtml += `
+        <tr style="text-align: center; font-size: 11px;">
+          <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 600;">${d}/${m}/${y}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: right;">${p.note || '-'}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold; color: #059669;">${formatCurrency(p.amount)}</td>
+        </tr>
+      `;
+    });
+  }
+
   // Write content
   iframeDoc.open();
   iframeDoc.write(`
@@ -147,8 +191,8 @@ export function exportMonthToPDF(
         }
         .summary-grid {
           display: grid;
-          grid-template-cols: repeat(4, 1fr);
-          gap: 15px;
+          grid-template-cols: repeat(5, 1fr);
+          gap: 12px;
           margin-bottom: 25px;
         }
         .card {
@@ -165,7 +209,7 @@ export function exportMonthToPDF(
           text-transform: uppercase;
         }
         .card-value {
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 700;
           color: #0f172a;
           margin: 0;
@@ -193,7 +237,7 @@ export function exportMonthToPDF(
           color: #ffffff;
           font-weight: bold;
           padding: 8px;
-          border: 1px solid #1e293b;
+          border: 1px solid #1e3a8a;
         }
         .signature-section {
           margin-top: 40px;
@@ -230,7 +274,7 @@ export function exportMonthToPDF(
         <div class="card">
           <p class="card-title">الراتب الأساسي</p>
           <p class="card-value">${formatCurrency(calculationResult.baseSalary)}</p>
-          <p class="card-desc">الراتب الصافي التعاقدي</p>
+          <p class="card-desc">${isCustomSalary ? 'راتب مخصص للشهر' : 'الراتب التعاقدي العام'}</p>
         </div>
         <div class="card" style="border-color: #fca5a5;">
           <p class="card-title" style="color: #ef4444;">إجمالي الخصومات</p>
@@ -242,16 +286,40 @@ export function exportMonthToPDF(
           <p class="card-value" style="color: #059669;">+${formatCurrency(calculationResult.totalOvertimePay)}</p>
           <p class="card-desc" style="color: #10b981;">إجمالي ساعات العمل الإضافي: ${totalOvertimeHours.toFixed(1)}س</p>
         </div>
-        <div class="card" style="background-color: #eff6ff; border-color: #93c5fd; ring: 1px solid #2563eb;">
+        <div class="card" style="background-color: #eff6ff; border-color: #93c5fd;">
           <p class="card-title" style="color: #2563eb;">صافي الراتب المستحق</p>
-          <p class="card-value" style="color: #1d4ed8; font-size: 18px;">${formatCurrency(calculationResult.netSalary)}</p>
-          <p class="card-desc" style="color: #2563eb;">الراتب النهائي الواجب صرفه</p>
+          <p class="card-value" style="color: #1d4ed8;">${formatCurrency(calculationResult.netSalary)}</p>
+          <p class="card-desc" style="color: #2563eb;">الراتب بعد الخصومات والإضافي</p>
+        </div>
+        <div class="card" style="background-color: ${remainingBg}; border-color: ${remainingBorder};">
+          <p class="card-title" style="color: ${remainingTextColor};">${remainingTitle}</p>
+          <p class="card-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(remaining))}</p>
+          <p class="card-desc" style="color: ${remainingTextColor};">إجمالي المقبوض: ${formatCurrency(calculationResult.totalPaymentsReceived)}</p>
         </div>
       </div>
 
-      <h2 class="section-title">ملخص المقاصة والتسوية الأسبوعية (Denkleştirme)</h2>
-      <div style="display: grid; grid-template-cols: repeat(5, 1fr); gap: 10px; margin-bottom: 25px;">
-        ${weeklyHtml}
+      <div style="display: grid; grid-template-cols: 2fr 1fr; gap: 20px; margin-bottom: 25px; align-items: start;">
+        <div>
+          <h2 class="section-title">ملخص المقاصة والتسوية الأسبوعية (Denkleştirme)</h2>
+          <div style="display: grid; grid-template-cols: repeat(5, 1fr); gap: 8px;">
+            ${weeklyHtml}
+          </div>
+        </div>
+        <div>
+          <h2 class="section-title">السلف والدفعات المقبوضة</h2>
+          <table class="table-container">
+            <thead>
+              <tr style="background-color: #475569;">
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 30%">التاريخ</th>
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 45%">البيان</th>
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paymentsRowsHtml}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <h2 class="section-title">سجل الحضور والعمل الإضافي اليومي الموثق</h2>

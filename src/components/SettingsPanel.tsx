@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSalary } from '../context/SalaryContext';
 import { Settings, Info, RefreshCw, X, ShieldAlert, Check } from 'lucide-react';
 
@@ -8,23 +8,54 @@ interface SettingsPanelProps {
 }
 
 export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
-  const { settings, updateSettings, clearAllData, calculationResult } = useSalary();
+  const { 
+    settings, 
+    updateSettings, 
+    clearAllData, 
+    calculationResult,
+    year,
+    month,
+    updateMonthlySalary,
+    clearMonthlySalary
+  } = useSalary();
+  
   const [baseSalary, setBaseSalary] = useState(settings.baseSalary);
   const [multiplierWeekdaySat, setMultiplierWeekdaySat] = useState(settings.multiplierWeekdaySat);
   const [multiplierSundayHoliday, setMultiplierSundayHoliday] = useState(settings.multiplierSundayHoliday);
   const [googleApiKey, setGoogleApiKey] = useState(settings.googleApiKey);
   const [showSavedToast, setShowSavedToast] = useState(false);
 
+  // Custom Monthly Salary state
+  const [hasCustomSalary, setHasCustomSalary] = useState(calculationResult.customMonthSalary !== undefined);
+  const [customSalaryVal, setCustomSalaryVal] = useState(calculationResult.customMonthSalary || settings.baseSalary);
+
+  // Sync state with selected month/year context changes
+  useEffect(() => {
+    setHasCustomSalary(calculationResult.customMonthSalary !== undefined);
+    setCustomSalaryVal(calculationResult.customMonthSalary || settings.baseSalary);
+    setBaseSalary(settings.baseSalary);
+  }, [calculationResult.customMonthSalary, settings.baseSalary, year, month]);
+
   if (!isOpen) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({
+    
+    // Save global settings
+    await updateSettings({
       baseSalary: Number(baseSalary),
       multiplierWeekdaySat: Number(multiplierWeekdaySat),
       multiplierSundayHoliday: Number(multiplierSundayHoliday),
       googleApiKey: googleApiKey.trim(),
     });
+
+    // Save custom monthly salary override
+    if (hasCustomSalary) {
+      await updateMonthlySalary(Number(customSalaryVal));
+    } else {
+      await clearMonthlySalary();
+    }
+
     setShowSavedToast(true);
     setTimeout(() => {
       setShowSavedToast(false);
@@ -77,20 +108,20 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 
                 {/* Real-time Base Wage Calculations Card */}
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-850">
-                  <h3 className="text-xs font-bold text-slate-450 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-slate-455 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <Info className="w-4 h-4 text-indigo-500" />
                     حسابات الأجور التلقائية
                   </h3>
                   <div className="grid grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1">
-                      <span className="text-slate-450 dark:text-slate-500">أجرة اليوم الواحد:</span>
+                      <span className="text-slate-455 dark:text-slate-500">أجرة اليوم الواحد:</span>
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
                         {formatCurrency(calculationResult.dailyWage)}
                       </p>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 block">(الراتب ÷ 30 يوماً)</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-slate-450 dark:text-slate-500">أجرة الساعة العادية:</span>
+                      <span className="text-slate-455 dark:text-slate-500">أجرة الساعة العادية:</span>
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
                         {formatCurrency(calculationResult.regularHourlyWage)}
                       </p>
@@ -102,7 +133,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                 {/* Base Salary Input */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
-                    الراتب الأساسي الصافي (TRY)
+                    الراتب الأساسي الصافي الافتراضي (TRY)
                   </label>
                   <input
                     type="number"
@@ -113,8 +144,41 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/30 transition-all font-semibold"
                   />
                   <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                    أدخل الراتب الشهري الصافي الفعلي المستلم بدون الإضافي.
+                    الراتب الافتراضي العام الذي يُعتمد لكافة أشهر السنة ما لم يتم تخصيصه لشهر معين.
                   </p>
+                </div>
+
+                {/* Custom Month Salary Override Toggle & Input */}
+                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 cursor-pointer" htmlFor="toggle-custom-salary">
+                      تحديد راتب مخصص لهذا الشهر فقط ({month + 1} / {year})
+                    </label>
+                    <input
+                      id="toggle-custom-salary"
+                      type="checkbox"
+                      checked={hasCustomSalary}
+                      onChange={(e) => setHasCustomSalary(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                    />
+                  </div>
+                  
+                  {hasCustomSalary && (
+                    <div className="space-y-2 animate-fade-in">
+                      <input
+                        type="number"
+                        value={customSalaryVal}
+                        onChange={(e) => setCustomSalaryVal(Number(e.target.value))}
+                        min="0"
+                        required
+                        placeholder="الراتب المخصص لهذا الشهر"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold text-sm"
+                      />
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                        سيتم تطبيق هذا الراتب فقط على شهر {month + 1} من عام {year}. بقية الأشهر ستعتمد الراتب الافتراضي.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Overtime Multiplier Weekday/Sat */}

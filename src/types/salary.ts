@@ -42,6 +42,13 @@ export interface DayBreakdown {
   flatOvertimeHours: number;
 }
 
+export interface Payment {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  note?: string;
+}
+
 export interface WeeklyBreakdown {
   weekIndex: number; // 1-based index of the week in the month
   weekLabel: string; // e.g. "Week 1 (01/07 - 05/07)"
@@ -85,4 +92,10 @@ export interface MonthlyCalculationResult {
   netSalary: number;
   
   weeklyBreakdowns: WeeklyBreakdown[];
+  
+  // Custom salary and payments attributes
+  customMonthSalary?: number;
+  totalPaymentsReceived: number;
+  remainingBalance: number;
+  currentMonthPayments: Payment[];
 }

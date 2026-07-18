@@ -8,6 +8,7 @@ import SalaryCalendar from '../components/SalaryCalendar';
 import SettingsPanel from '../components/SettingsPanel';
 import ExceptionModal from '../components/ExceptionModal';
 import AuthScreen from '../components/AuthScreen';
+import PaymentsLog from '../components/PaymentsLog';
 import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download, LogOut, FileText } from 'lucide-react';
 import { generateMonthlyBreakdown } from '../utils/salaryCalculator';
 import { exportMonthToCSV } from '../utils/csvExporter';
@@ -220,6 +221,11 @@ export default function Home() {
         {/* 2. Interactive Calendar and Weekly Equalization Panel */}
         <section aria-label="Monthly calendar and breakdowns">
           <SalaryCalendar onSelectDate={setSelectedDate} />
+        </section>
+
+        {/* 3. Payments Registry Log */}
+        <section aria-label="Payments received log">
+          <PaymentsLog />
         </section>
 
         {/* 3. Turkish Labor Law Reference Guide */}

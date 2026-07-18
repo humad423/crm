@@ -37,7 +37,9 @@ export function exportMonthToCSV(
   csvContent += `أجر إضافي أحد/عطل (2.0x),${calculationResult.overtime2xPay.toFixed(2)} TRY\n`;
   
   csvContent += `إجمالي مستحقات العمل الإضافي,${calculationResult.totalOvertimePay.toFixed(2)} TRY\n`;
-  csvContent += `الراتب الصافي النهائي المتوقع,${calculationResult.netSalary.toFixed(2)} TRY\n\n`;
+  csvContent += `الراتب الصافي النهائي المتوقع,${calculationResult.netSalary.toFixed(2)} TRY\n`;
+  csvContent += `إجمالي الدفعات المستلمة,${calculationResult.totalPaymentsReceived.toFixed(2)} TRY\n`;
+  csvContent += `الرصيد المتبقي (مستحق للموظف / مستحق للشركة),${calculationResult.remainingBalance.toFixed(2)} TRY\n\n`;
 
   // Daily Grid Table Headers
   const headers = [

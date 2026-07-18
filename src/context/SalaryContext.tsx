@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserSettings, ExceptionEvent, Holiday, MonthlyCalculationResult } from '../types/salary';
+import { UserSettings, ExceptionEvent, Holiday, MonthlyCalculationResult, Payment } from '../types/salary';
 import { calculateMonthlySalary } from '../utils/salaryCalculator';
 import { supabase } from '../utils/supabaseClient';
 import { User } from '@supabase/supabase-js';
@@ -25,6 +25,14 @@ interface SalaryContextType {
   login: (username: string, password: string) => Promise<{ error: any }>;
   signup: (username: string, password: string) => Promise<{ error: any }>;
   logout: () => Promise<void>;
+  
+  // Custom salary and payments additions
+  monthlySalaries: { [key: string]: number };
+  payments: Payment[];
+  updateMonthlySalary: (salary: number) => Promise<void>;
+  clearMonthlySalary: () => Promise<void>;
+  addPayment: (payment: { date: string; amount: number; note?: string }) => Promise<void>;
+  deletePayment: (id: string) => Promise<void>;
 }
 
 const defaultSettings: UserSettings = {
@@ -48,6 +56,10 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   const [isLoadingHolidays, setIsLoadingHolidays] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
+  
+  // Custom monthly salary and payments state
+  const [monthlySalaries, setMonthlySalaries] = useState<{ [key: string]: number }>({});
+  const [payments, setPayments] = useState<Payment[]>([]);
 
   // 1. Listen to Auth Changes and load session on mount
   useEffect(() => {
@@ -133,6 +145,40 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         }));
         setExceptions(mappedExceptions);
       }
+
+      // C. Fetch Monthly Salaries
+      const { data: monthlySalariesData, error: monthlySalariesErr } = await supabase
+        .from('monthly_salaries')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (monthlySalariesData) {
+        const salariesMap: { [key: string]: number } = {};
+        monthlySalariesData.forEach((s) => {
+          salariesMap[`${s.year}-${s.month}`] = Number(s.base_salary);
+        });
+        setMonthlySalaries(salariesMap);
+      } else {
+        setMonthlySalaries({});
+      }
+
+      // D. Fetch Payments
+      const { data: paymentsData, error: paymentsErr } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (paymentsData) {
+        const mappedPayments: Payment[] = paymentsData.map((p) => ({
+          id: p.id,
+          date: p.date,
+          amount: Number(p.amount),
+          note: p.note || undefined,
+        }));
+        setPayments(mappedPayments);
+      } else {
+        setPayments([]);
+      }
     } catch (err) {
       console.error('Error fetching user data:', err);
     }
@@ -156,6 +202,20 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           try { setExceptions(JSON.parse(savedExceptions)); } catch (e) {}
         } else {
           setExceptions([]);
+        }
+
+        const savedMonthlySalaries = localStorage.getItem('salary_monthly_salaries');
+        if (savedMonthlySalaries) {
+          try { setMonthlySalaries(JSON.parse(savedMonthlySalaries)); } catch (e) {}
+        } else {
+          setMonthlySalaries({});
+        }
+
+        const savedPayments = localStorage.getItem('salary_payments');
+        if (savedPayments) {
+          try { setPayments(JSON.parse(savedPayments)); } catch (e) {}
+        } else {
+          setPayments([]);
         }
       }
     }
@@ -211,9 +271,41 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           await supabase.from('exceptions').insert(dbExceptions);
         }
 
+        // Migrate monthly salaries
+        if (Object.keys(monthlySalaries).length > 0) {
+          const dbSalaries = Object.entries(monthlySalaries).map(([key, sal]) => {
+            const [y, m] = key.split('-').map(Number);
+            return {
+              user_id: newUserId,
+              year: y,
+              month: m,
+              base_salary: sal,
+            };
+          });
+          await supabase.from('monthly_salaries').upsert(dbSalaries);
+        }
+
+        // Migrate payments
+        if (payments.length > 0) {
+          const dbPayments = payments.map((p) => {
+            const [y, m] = p.date.split('-').map(Number);
+            return {
+              user_id: newUserId,
+              year: y,
+              month: m - 1, // 0-based
+              amount: p.amount,
+              date: p.date,
+              note: p.note || '',
+            };
+          });
+          await supabase.from('payments').insert(dbPayments);
+        }
+
         // C. Clear local storage offline keys
         localStorage.removeItem('salary_settings');
         localStorage.removeItem('salary_exceptions');
+        localStorage.removeItem('salary_monthly_salaries');
+        localStorage.removeItem('salary_payments');
       } catch (migrationErr) {
         console.error('Local data migration failed:', migrationErr);
       }
@@ -344,8 +436,10 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const clearAllData = async () => {
     if (user) {
-      // Clear Supabase exceptions & reset settings
+      // Clear Supabase exceptions, monthly salaries, payments & reset settings
       await supabase.from('exceptions').delete().eq('user_id', user.id);
+      await supabase.from('monthly_salaries').delete().eq('user_id', user.id);
+      await supabase.from('payments').delete().eq('user_id', user.id);
       await supabase.from('user_settings').upsert({
         user_id: user.id,
         base_salary: defaultSettings.baseSalary,
@@ -359,9 +453,13 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
     setSettings(defaultSettings);
     setExceptions([]);
+    setMonthlySalaries({});
+    setPayments([]);
     
     localStorage.removeItem('salary_settings');
     localStorage.removeItem('salary_exceptions');
+    localStorage.removeItem('salary_monthly_salaries');
+    localStorage.removeItem('salary_payments');
     localStorage.removeItem('salary_selected_year');
     localStorage.removeItem('salary_selected_month');
   };
@@ -396,8 +494,103 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     fetchHolidays();
   }, [year, settings.googleApiKey]);
 
+  const updateMonthlySalary = async (salary: number) => {
+    const key = `${year}-${month}`;
+    const updated = { ...monthlySalaries, [key]: salary };
+    setMonthlySalaries(updated);
+
+    if (user) {
+      await supabase.from('monthly_salaries').upsert({
+        user_id: user.id,
+        year,
+        month,
+        base_salary: salary,
+      });
+    } else {
+      localStorage.setItem('salary_monthly_salaries', JSON.stringify(updated));
+    }
+  };
+
+  const clearMonthlySalary = async () => {
+    const key = `${year}-${month}`;
+    const updated = { ...monthlySalaries };
+    delete updated[key];
+    setMonthlySalaries(updated);
+
+    if (user) {
+      await supabase.from('monthly_salaries').delete().eq('user_id', user.id).eq('year', year).eq('month', month);
+    } else {
+      localStorage.setItem('salary_monthly_salaries', JSON.stringify(updated));
+    }
+  };
+
+  const addPayment = async (paymentInput: { date: string; amount: number; note?: string }) => {
+    if (user) {
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          user_id: user.id,
+          year,
+          month,
+          amount: paymentInput.amount,
+          date: paymentInput.date,
+          note: paymentInput.note || '',
+        })
+        .select()
+        .single();
+
+      if (data) {
+        const newPayment: Payment = {
+          id: data.id,
+          date: data.date,
+          amount: Number(data.amount),
+          note: data.note || undefined,
+        };
+        setPayments((prev) => [...prev, newPayment]);
+      }
+    } else {
+      const newPayment: Payment = {
+        id: Math.random().toString(36).substring(2, 9),
+        date: paymentInput.date,
+        amount: paymentInput.amount,
+        note: paymentInput.note,
+      };
+      const updated = [...payments, newPayment];
+      setPayments(updated);
+      localStorage.setItem('salary_payments', JSON.stringify(updated));
+    }
+  };
+
+  const deletePayment = async (id: string) => {
+    if (user) {
+      await supabase.from('payments').delete().eq('user_id', user.id).eq('id', id);
+      setPayments((prev) => prev.filter((p) => p.id !== id));
+    } else {
+      const updated = payments.filter((p) => p.id !== id);
+      setPayments(updated);
+      localStorage.setItem('salary_payments', JSON.stringify(updated));
+    }
+  };
+
   // Calculate salary breakdowns
-  const calculationResult = calculateMonthlySalary(year, month, settings, exceptions, holidays);
+  const customSalary = monthlySalaries[`${year}-${month}`];
+  const rawResult = calculateMonthlySalary(year, month, settings, exceptions, holidays, customSalary);
+
+  const currentMonthPayments = payments.filter((p) => {
+    const [pYear, pMonth] = p.date.split('-').map(Number);
+    return pYear === year && (pMonth - 1) === month;
+  });
+
+  const totalPaymentsReceived = currentMonthPayments.reduce((sum, p) => sum + p.amount, 0);
+  const remainingBalance = rawResult.netSalary - totalPaymentsReceived;
+
+  const calculationResult = {
+    ...rawResult,
+    customMonthSalary: customSalary,
+    totalPaymentsReceived,
+    remainingBalance,
+    currentMonthPayments,
+  };
 
   return (
     <SalaryContext.Provider
@@ -420,6 +613,12 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         login,
         signup,
         logout,
+        monthlySalaries,
+        payments,
+        updateMonthlySalary,
+        clearMonthlySalary,
+        addPayment,
+        deletePayment,
       }}
     >
       {children}

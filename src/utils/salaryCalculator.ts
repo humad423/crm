@@ -293,9 +293,11 @@ export function calculateMonthlySalary(
   month: number, // 0-based
   settings: UserSettings,
   exceptions: ExceptionEvent[],
-  holidays: Holiday[]
+  holidays: Holiday[],
+  customSalary?: number
 ): MonthlyCalculationResult {
-  const { baseSalary, multiplierWeekdaySat, multiplierSundayHoliday } = settings;
+  const baseSalary = customSalary !== undefined ? customSalary : settings.baseSalary;
+  const { multiplierWeekdaySat, multiplierSundayHoliday } = settings;
 
   // 1. Calculate base rates:
   // - Accounting month is always 30 days. Daily wage = Salary / 30.
@@ -359,5 +361,9 @@ export function calculateMonthlySalary(
     totalOvertimePay,
     netSalary,
     weeklyBreakdowns,
+    customMonthSalary: customSalary,
+    totalPaymentsReceived: 0,
+    remainingBalance: netSalary,
+    currentMonthPayments: [],
   };
 }
