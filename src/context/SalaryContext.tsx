@@ -600,38 +600,18 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     currentMonthPayments,
   };
 
-  // ── Cumulative balance across ALL months ────────────────────────────────────
-  // Collect unique year-month keys that have any exception or payment logged
-  const monthKeys = new Set<string>();
-  exceptions.forEach((e) => {
-    const [ey, em] = e.date.split('-').map(Number);
-    monthKeys.add(`${ey}-${em - 1}`); // store as 0-based month
-  });
-  payments.forEach((p) => {
-    const [py, pm] = p.date.split('-').map(Number);
-    monthKeys.add(`${py}-${pm - 1}`);
-  });
-
+  // ── Cumulative balance — simple flat approach ───────────────────────────────
+  // For every month from January up to the currently selected month (inclusive),
+  // use the custom salary if one is set for that month, otherwise the global base salary.
+  // No per-month overtime / deduction math — this is intentionally kept "general".
   let cumulativeTotalEarned = 0;
-  let cumulativeTotalPaid = 0;
+  for (let m = 0; m <= month; m++) {
+    const key = `${year}-${m}`;
+    cumulativeTotalEarned += monthlySalaries[key] ?? settings.baseSalary;
+  }
 
-  monthKeys.forEach((key) => {
-    const [ky, km] = key.split('-').map(Number);
-    const monthExceptions = exceptions.filter((e) => {
-      const [ey, em] = e.date.split('-').map(Number);
-      return ey === ky && em - 1 === km;
-    });
-    const customMonthlySalary = monthlySalaries[key];
-    // Use same holidays (they apply to current year; past years reuse same set for approximation)
-    const monthResult = calculateMonthlySalary(ky, km, settings, monthExceptions, holidays, customMonthlySalary);
-    cumulativeTotalEarned += monthResult.netSalary;
-
-    const monthPayments = payments.filter((p) => {
-      const [py, pm] = p.date.split('-').map(Number);
-      return py === ky && pm - 1 === km;
-    });
-    cumulativeTotalPaid += monthPayments.reduce((sum, p) => sum + p.amount, 0);
-  });
+  // Total paid = every payment ever recorded (across all dates/years)
+  const cumulativeTotalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
   const cumulativeBalance = cumulativeTotalEarned - cumulativeTotalPaid;
   // ───────────────────────────────────────────────────────────────────────────

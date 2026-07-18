@@ -20,7 +20,7 @@ export default function CumulativeBalanceCard() {
   const config = isZero
     ? {
         label: 'الرصيد الإجمالي مستوفى',
-        subLabel: 'لا يوجد مستحقات متراكمة',
+        subLabel: 'مجموع الرواتب = مجموع الدفعات',
         bg: 'from-slate-800 to-slate-900',
         badgeBg: 'bg-slate-700 text-slate-300',
         valueCls: 'text-slate-300',
@@ -32,8 +32,8 @@ export default function CumulativeBalanceCard() {
       }
     : isPositive
     ? {
-        label: 'المستحق لك (الإجمالي)',
-        subLabel: 'مستحقات لم تُصرف بعد',
+        label: 'المستحق لك حتى الآن',
+        subLabel: 'مجموع الرواتب أكبر من مجموع الدفعات',
         bg: 'from-emerald-800 to-teal-900',
         badgeBg: 'bg-emerald-700/60 text-emerald-200',
         valueCls: 'text-emerald-300',
@@ -44,8 +44,8 @@ export default function CumulativeBalanceCard() {
         barCls: 'bg-emerald-500',
       }
     : {
-        label: 'المستحق عليك (الإجمالي)',
-        subLabel: 'استلمت أكثر من مستحقاتك',
+        label: 'مبلغ زائد عليك',
+        subLabel: 'الدفعات المستلمة تجاوزت مجموع الرواتب',
         bg: 'from-rose-800 to-red-900',
         badgeBg: 'bg-rose-700/60 text-rose-200',
         valueCls: 'text-rose-300',
@@ -115,7 +115,7 @@ export default function CumulativeBalanceCard() {
             <div className="bg-white/10 rounded-xl px-3 py-2">
               <div className="flex items-center gap-1 text-[10px] text-white/50 mb-0.5">
                 <ArrowUpRight className="w-3 h-3 text-emerald-400" />
-                إجمالي المستحق
+                إجمالي الرواتب (يناير→الشهر الحالي)
               </div>
               <p className="text-xs font-bold text-white truncate">
                 {formatCurrency(cumulativeTotalEarned)}
@@ -124,7 +124,7 @@ export default function CumulativeBalanceCard() {
             <div className="bg-white/10 rounded-xl px-3 py-2">
               <div className="flex items-center gap-1 text-[10px] text-white/50 mb-0.5">
                 <ArrowDownRight className="w-3 h-3 text-rose-400" />
-                إجمالي المقبوض
+                إجمالي الدفعات المستلمة
               </div>
               <p className="text-xs font-bold text-white truncate">
                 {formatCurrency(cumulativeTotalPaid)}
