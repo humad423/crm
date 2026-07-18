@@ -601,12 +601,16 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   };
 
   // ── Cumulative balance — simple flat approach ───────────────────────────────
-  // For every month from January up to the currently selected month (inclusive),
-  // use the custom salary if one is set for that month, otherwise the global base salary.
-  // No per-month overtime / deduction math — this is intentionally kept "general".
+  // Always compute up to TODAY's real month (not the dashboard-selected month).
+  // For every month from January up to the current real month (inclusive),
+  // use the custom salary if one is set, otherwise the global base salary.
+  const today = new Date();
+  const realYear = today.getFullYear();
+  const realMonth = today.getMonth(); // 0-based
+
   let cumulativeTotalEarned = 0;
-  for (let m = 0; m <= month; m++) {
-    const key = `${year}-${m}`;
+  for (let m = 0; m <= realMonth; m++) {
+    const key = `${realYear}-${m}`;
     cumulativeTotalEarned += monthlySalaries[key] ?? settings.baseSalary;
   }
 
