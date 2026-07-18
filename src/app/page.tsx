@@ -9,6 +9,7 @@ import SettingsPanel from '../components/SettingsPanel';
 import ExceptionModal from '../components/ExceptionModal';
 import AuthScreen from '../components/AuthScreen';
 import PaymentsLog from '../components/PaymentsLog';
+import CumulativeBalanceCard from '../components/CumulativeBalanceCard';
 import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download, LogOut, FileText } from 'lucide-react';
 import { generateMonthlyBreakdown } from '../utils/salaryCalculator';
 import { exportMonthToCSV } from '../utils/csvExporter';
@@ -213,7 +214,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 1. Summary Metrics Dashboard */}
+        {/* 1. Cumulative Balance Banner */}
+        <section aria-label="Cumulative balance">
+          <CumulativeBalanceCard />
+        </section>
+
+        {/* 2. Summary Metrics Dashboard */}
         <section aria-label="Statistics Summary">
           <MetricCards />
         </section>

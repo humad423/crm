@@ -33,6 +33,10 @@ interface SalaryContextType {
   clearMonthlySalary: (targetYear?: number, targetMonth?: number) => Promise<void>;
   addPayment: (payment: { date: string; amount: number; note?: string }) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
+  // Cumulative balance across ALL months
+  cumulativeBalance: number;
+  cumulativeTotalEarned: number;
+  cumulativeTotalPaid: number;
 }
 
 const defaultSettings: UserSettings = {
@@ -576,7 +580,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Calculate salary breakdowns
+  // Calculate salary breakdowns for selected month
   const customSalary = monthlySalaries[`${year}-${month}`];
   const rawResult = calculateMonthlySalary(year, month, settings, exceptions, holidays, customSalary);
 
@@ -595,6 +599,42 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     remainingBalance,
     currentMonthPayments,
   };
+
+  // ── Cumulative balance across ALL months ────────────────────────────────────
+  // Collect unique year-month keys that have any exception or payment logged
+  const monthKeys = new Set<string>();
+  exceptions.forEach((e) => {
+    const [ey, em] = e.date.split('-').map(Number);
+    monthKeys.add(`${ey}-${em - 1}`); // store as 0-based month
+  });
+  payments.forEach((p) => {
+    const [py, pm] = p.date.split('-').map(Number);
+    monthKeys.add(`${py}-${pm - 1}`);
+  });
+
+  let cumulativeTotalEarned = 0;
+  let cumulativeTotalPaid = 0;
+
+  monthKeys.forEach((key) => {
+    const [ky, km] = key.split('-').map(Number);
+    const monthExceptions = exceptions.filter((e) => {
+      const [ey, em] = e.date.split('-').map(Number);
+      return ey === ky && em - 1 === km;
+    });
+    const customMonthlySalary = monthlySalaries[key];
+    // Use same holidays (they apply to current year; past years reuse same set for approximation)
+    const monthResult = calculateMonthlySalary(ky, km, settings, monthExceptions, holidays, customMonthlySalary);
+    cumulativeTotalEarned += monthResult.netSalary;
+
+    const monthPayments = payments.filter((p) => {
+      const [py, pm] = p.date.split('-').map(Number);
+      return py === ky && pm - 1 === km;
+    });
+    cumulativeTotalPaid += monthPayments.reduce((sum, p) => sum + p.amount, 0);
+  });
+
+  const cumulativeBalance = cumulativeTotalEarned - cumulativeTotalPaid;
+  // ───────────────────────────────────────────────────────────────────────────
 
   return (
     <SalaryContext.Provider
@@ -623,6 +663,9 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         clearMonthlySalary,
         addPayment,
         deletePayment,
+        cumulativeBalance,
+        cumulativeTotalEarned,
+        cumulativeTotalPaid,
       }}
     >
       {children}
