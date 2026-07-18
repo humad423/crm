@@ -33,6 +33,7 @@ interface SalaryContextType {
   clearMonthlySalary: (targetYear?: number, targetMonth?: number) => Promise<void>;
   addPayment: (payment: { date: string; amount: number; note?: string }) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
+  updatePayment: (id: string, updates: { date: string; amount: number; note?: string }) => Promise<void>;
   // Cumulative balance across ALL months
   cumulativeBalance: number;
   cumulativeTotalEarned: number;
@@ -580,6 +581,35 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updatePayment = async (id: string, updates: { date: string; amount: number; note?: string }) => {
+    if (user) {
+      await supabase
+        .from('payments')
+        .update({
+          amount: updates.amount,
+          date: updates.date,
+          note: updates.note || '',
+        })
+        .eq('user_id', user.id)
+        .eq('id', id);
+      setPayments((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? { ...p, amount: updates.amount, date: updates.date, note: updates.note }
+            : p
+        )
+      );
+    } else {
+      const updated = payments.map((p) =>
+        p.id === id
+          ? { ...p, amount: updates.amount, date: updates.date, note: updates.note }
+          : p
+      );
+      setPayments(updated);
+      localStorage.setItem('salary_payments', JSON.stringify(updated));
+    }
+  };
+
   // Calculate salary breakdowns for selected month
   const customSalary = monthlySalaries[`${year}-${month}`];
   const rawResult = calculateMonthlySalary(year, month, settings, exceptions, holidays, customSalary);
@@ -654,6 +684,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         clearMonthlySalary,
         addPayment,
         deletePayment,
+        updatePayment,
         cumulativeBalance,
         cumulativeTotalEarned,
         cumulativeTotalPaid,

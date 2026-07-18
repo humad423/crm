@@ -16,7 +16,7 @@ import { exportMonthToPDF } from '../utils/pdfExporter';
 import { ReportLang } from '../utils/translations';
 
 export default function Home() {
-  const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized, user, logout } = useSalary();
+  const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized, user, logout, cumulativeBalance, cumulativeTotalEarned, cumulativeTotalPaid } = useSalary();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -30,7 +30,7 @@ export default function Home() {
 
   const handleExportPDF = () => {
     const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays);
-    exportMonthToPDF(year, month, months[month], settings, calculationResult, dayBreakdowns, exceptions, exportLang);
+    exportMonthToPDF(year, month, months[month], settings, calculationResult, dayBreakdowns, exceptions, exportLang, cumulativeBalance, cumulativeTotalEarned, cumulativeTotalPaid);
   };
 
   // Load and apply theme (Defaulting to light mode)

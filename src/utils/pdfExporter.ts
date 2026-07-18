@@ -13,7 +13,10 @@ export function exportMonthToPDF(
   calculationResult: MonthlyCalculationResult,
   dayBreakdowns: DayBreakdown[],
   exceptions: ExceptionEvent[],
-  lang: ReportLang = 'ar'
+  lang: ReportLang = 'ar',
+  cumulativeBalance: number = 0,
+  cumulativeTotalEarned: number = 0,
+  cumulativeTotalPaid: number = 0
 ) {
   const t = reportTranslations[lang];
   const isRtl = lang === 'ar';
@@ -35,7 +38,8 @@ export function exportMonthToPDF(
   const totalOvertimeHours = calculationResult.overtime1xHours + calculationResult.overtime1_5xHours + calculationResult.overtime2xHours;
 
   const isCustomSalary = calculationResult.customMonthSalary !== undefined;
-  const remaining = calculationResult.remainingBalance;
+  // Use the overall cumulative balance (not single-month diff) for the footer pill
+  const remaining = cumulativeBalance;
 
   let remainingTitle = t.remainingBalanceSettled;
   let remainingBg = '#f8fafc';
@@ -324,8 +328,12 @@ export function exportMonthToPDF(
           <span class="pill-label" style="color: #2563eb;">${t.netSalaryDue}</span>
           <span class="pill-value" style="color: #1d4ed8;">${formatCurrency(calculationResult.netSalary)}</span>
         </div>
+        <div class="summary-pill" style="border-color: #cbd5e1;">
+          <span class="pill-label" style="color: #475569;">${t.totalReceived}</span>
+          <span class="pill-value" style="color: #334155;">${formatCurrency(cumulativeTotalPaid)}</span>
+        </div>
         <div class="summary-pill" style="border-color: ${remainingBorder}; background-color: ${remainingBg};">
-          <span class="pill-label" style="color: ${remainingTextColor};">${remainingTitle}</span>
+          <span class="pill-label" style="color: ${remainingTextColor};">${remainingTitle} (${lang === 'ar' ? 'الإجمالي' : lang === 'tr' ? 'Toplam' : 'Overall'})</span>
           <span class="pill-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(remaining))}</span>
         </div>
       </div>
