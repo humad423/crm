@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSalary } from '../context/SalaryContext';
-import { Settings, Info, RefreshCw, X, ShieldAlert, Check, Calendar } from 'lucide-react';
+import { Settings, Info, RefreshCw, X, ShieldAlert, Check, Calendar, FileText, Download } from 'lucide-react';
+import { exportRangeToCSV } from '../utils/csvExporter';
+import { exportRangeToPDF } from '../utils/pdfExporter';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -17,7 +19,10 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     month,
     monthlySalaries,
     updateMonthlySalary,
-    clearMonthlySalary
+    clearMonthlySalary,
+    exceptions,
+    holidays,
+    payments
   } = useSalary();
   
   const [baseSalary, setBaseSalary] = useState(settings.baseSalary);
@@ -25,6 +30,10 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [multiplierSundayHoliday, setMultiplierSundayHoliday] = useState(settings.multiplierSundayHoliday);
   const [googleApiKey, setGoogleApiKey] = useState(settings.googleApiKey);
   const [showSavedToast, setShowSavedToast] = useState(false);
+
+  // Range and annual report date states
+  const [reportStart, setReportStart] = useState(`${year}-01-01`);
+  const [reportEnd, setReportEnd] = useState(`${year}-12-31`);
 
   // Local state to store monthly overrides for the year
   const [localMonthlySalaries, setLocalMonthlySalaries] = useState<{ [key: string]: number }>({});
@@ -289,6 +298,57 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                   <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
                     يُستخدم لجلب "العطل الرسمية في تركيا" تلقائياً. في حال عدم إدخاله، سيقوم التطبيق بالاعتماد على قاعدة بيانات داخلية لعام 2026.
                   </p>
+                </div>
+
+                {/* Custom Range Export Section */}
+                <div className="border-t border-slate-150 dark:border-slate-800 pt-6 space-y-4">
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-indigo-500" />
+                    تصدير التقارير المخصصة والسنوية
+                  </h4>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                    حدد تاريخ البدء والنهاية لتصدير كشف حساب موحد يجمع تفاصيل الأشهر والدفعات المستلمة في هذه الفترة.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-455 dark:text-slate-500 uppercase">تاريخ البدء</label>
+                      <input
+                        type="date"
+                        value={reportStart}
+                        onChange={(e) => setReportStart(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-455 dark:text-slate-500 uppercase">تاريخ النهاية</label>
+                      <input
+                        type="date"
+                        value={reportEnd}
+                        onChange={(e) => setReportEnd(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => exportRangeToCSV(reportStart, reportEnd, settings, exceptions, holidays, monthlySalaries, payments)}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all shadow-sm"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      تصدير كـ CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => exportRangeToPDF(reportStart, reportEnd, settings, exceptions, holidays, monthlySalaries, payments)}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-900/30 text-indigo-650 dark:text-indigo-400 rounded-xl text-xs font-bold transition-all border border-indigo-100 dark:border-indigo-900/30 shadow-sm"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      طباعة تقرير PDF
+                    </button>
+                  </div>
                 </div>
 
                 {/* Reset Section */}

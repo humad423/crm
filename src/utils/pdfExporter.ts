@@ -1,4 +1,5 @@
-import { DayBreakdown, MonthlyCalculationResult, UserSettings, ExceptionEvent } from '../types/salary';
+import { DayBreakdown, MonthlyCalculationResult, UserSettings, ExceptionEvent, Payment, Holiday } from '../types/salary';
+import { calculateMonthlySalary } from './salaryCalculator';
 
 /**
  * Generates and prints a professional PDF report of the monthly salary calculation.
@@ -354,6 +355,361 @@ export function exportMonthToPDF(
           <p>توقيع المدير العام</p>
           <div class="signature-line"></div>
           <p style="font-size: 9px; color: #64748b;">يُعتمد الصرف</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  iframeDoc.close();
+
+  // Print once resources load
+  const iframeWindow = iframe.contentWindow;
+  if (iframeWindow) {
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframeWindow.focus();
+        iframeWindow.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 500);
+    };
+  }
+}
+
+/**
+ * Generates and prints a professional PDF report for a custom date range.
+ */
+export function exportRangeToPDF(
+  startDateStr: string,
+  endDateStr: string,
+  settings: UserSettings,
+  exceptions: ExceptionEvent[],
+  holidays: Holiday[],
+  monthlySalaries: { [key: string]: number },
+  payments: Payment[]
+) {
+  const start = new Date(startDateStr);
+  const end = new Date(endDateStr);
+  
+  // Find all year-month pairs in the range
+  const monthsInRange: { year: number; month: number }[] = [];
+  let curr = new Date(start.getFullYear(), start.getMonth(), 1);
+  const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+  
+  while (curr <= targetEnd) {
+    monthsInRange.push({
+      year: curr.getFullYear(),
+      month: curr.getMonth(),
+    });
+    curr.setMonth(curr.getMonth() + 1);
+  }
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: 'TRY',
+      maximumFractionDigits: 2,
+    }).format(val);
+  };
+
+  // Calculate each month
+  let rangeBaseSalary = 0;
+  let rangeOvertimePay = 0;
+  let rangeDeductions = 0;
+  let rangeNetSalary = 0;
+
+  let monthlyRowsHtml = '';
+
+  monthsInRange.forEach(({ year, month }) => {
+    const key = `${year}-${month}`;
+    const customSalary = monthlySalaries[key];
+    const monthExceptions = exceptions.filter((e) => {
+      const [ey, em] = e.date.split('-').map(Number);
+      return ey === year && (em - 1) === month;
+    });
+    
+    const monthRes = calculateMonthlySalary(year, month, settings, monthExceptions, holidays, customSalary);
+    const monthDeductions = monthRes.totalAbsenceDeduction + monthRes.totalDelayDeduction;
+    
+    rangeBaseSalary += monthRes.baseSalary;
+    rangeOvertimePay += monthRes.totalOvertimePay;
+    rangeDeductions += monthDeductions;
+    rangeNetSalary += monthRes.netSalary;
+
+    const monthLabel = `${month + 1} / ${year}`;
+    monthlyRowsHtml += `
+      <tr style="text-align: center;">
+        <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: 600;">${monthLabel}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0;">${formatCurrency(monthRes.baseSalary)}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0; color: #059669; font-weight: 500;">+${formatCurrency(monthRes.totalOvertimePay)}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0; color: #dc2626;">-${formatCurrency(monthDeductions)}</td>
+        <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold; color: #1d4ed8;">${formatCurrency(monthRes.netSalary)}</td>
+      </tr>
+    `;
+  });
+
+  // Payments in range
+  const rangePayments = payments.filter((p) => {
+    const pDate = new Date(p.date);
+    return pDate >= start && pDate <= end;
+  });
+  const rangeTotalPaid = rangePayments.reduce((sum, p) => sum + p.amount, 0);
+  const rangeBalance = rangeNetSalary - rangeTotalPaid;
+
+  let remainingTitle = 'الرصيد المتبقي (مستوفى)';
+  let remainingBg = '#f8fafc';
+  let remainingBorder = '#e2e8f0';
+  let remainingTextColor = '#0f172a';
+  
+  if (rangeBalance > 0) {
+    remainingTitle = 'الرصيد المتبقي (لك)';
+    remainingBg = '#f0fdf4';
+    remainingBorder = '#6ee7b7';
+    remainingTextColor = '#15803d';
+  } else if (rangeBalance < 0) {
+    remainingTitle = 'الرصيد المتبقي (عليك)';
+    remainingBg = '#fef2f2';
+    remainingBorder = '#fca5a5';
+    remainingTextColor = '#b91c1c';
+  }
+
+  // Generate Payments list HTML rows
+  let paymentsRowsHtml = '';
+  if (rangePayments.length === 0) {
+    paymentsRowsHtml = `
+      <tr>
+        <td colspan="3" style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 11px;">
+          لا توجد أي سُلف أو دفعات مسجلة في هذه الفترة.
+        </td>
+      </tr>
+    `;
+  } else {
+    rangePayments.forEach((p) => {
+      const [y, m, d] = p.date.split('-').map(Number);
+      paymentsRowsHtml += `
+        <tr style="text-align: center; font-size: 11px;">
+          <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 600;">${d}/${m}/${y}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: right;">${p.note || '-'}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold; color: #059669;">${formatCurrency(p.amount)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  // Create iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) return;
+
+  // Write range content
+  iframeDoc.open();
+  iframeDoc.write(`
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="utf-8">
+      <title>تقرير الرواتب المخصص - من ${startDateStr} إلى ${endDateStr}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+      <style>
+        body {
+          font-family: 'Cairo', sans-serif;
+          margin: 0;
+          padding: 20px;
+          color: #0f172a;
+          background-color: #ffffff;
+        }
+        @media print {
+          body {
+            padding: 0;
+          }
+        }
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 2px solid #cbd5e1;
+          padding-bottom: 15px;
+          margin-bottom: 20px;
+        }
+        .title {
+          font-size: 20px;
+          font-weight: 700;
+          color: #1e3a8a;
+          margin: 0;
+        }
+        .meta-text {
+          font-size: 11px;
+          color: #475569;
+          margin: 2px 0;
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-cols: repeat(6, 1fr);
+          gap: 10px;
+          margin-bottom: 25px;
+        }
+        .card {
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 10px;
+          background-color: #f8fafc;
+          text-align: center;
+        }
+        .card-title {
+          font-size: 9px;
+          font-weight: bold;
+          color: #64748b;
+          margin: 0 0 5px 0;
+          text-transform: uppercase;
+        }
+        .card-value {
+          font-size: 14px;
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0;
+        }
+        .card-desc {
+          font-size: 8px;
+          color: #64748b;
+          margin: 5px 0 0 0;
+        }
+        .section-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #1e293b;
+          border-right: 3px solid #6366f1;
+          padding-right: 8px;
+          margin: 20px 0 10px 0;
+        }
+        .table-container {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 11px;
+        }
+        .table-container th {
+          background-color: #0f172a;
+          color: #ffffff;
+          font-weight: bold;
+          padding: 8px;
+          border: 1px solid #1e3a8a;
+        }
+        .signature-section {
+          margin-top: 40px;
+          display: flex;
+          justify-content: space-between;
+          padding: 0 40px;
+          font-size: 12px;
+        }
+        .signature-box {
+          text-align: center;
+          width: 150px;
+        }
+        .signature-line {
+          border-bottom: 1px solid #475569;
+          margin-top: 40px;
+          margin-bottom: 5px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <h1 class="title">تقرير حساب الرواتب والأجور الموحد</h1>
+          <p class="meta-text" style="font-weight: bold;">النطاق المختار: من ${startDateStr} إلى ${endDateStr}</p>
+          <p class="meta-text">قواعد الحساب: قانون العمل التركي (45 ساعة أسبوعية / 225 ساعة شهرية)</p>
+        </div>
+        <div style="text-align: left;">
+          <p class="meta-text" style="font-weight: bold; font-size: 13px; color: #1e3a8a;">برنامج إدارة الأجور crm</p>
+          <p class="meta-text">تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-EG')}</p>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="card">
+          <p class="card-title">إجمالي الرواتب الأساسية</p>
+          <p class="card-value">${formatCurrency(rangeBaseSalary)}</p>
+          <p class="card-desc">الرواتب الأساسية للفترة</p>
+        </div>
+        <div class="card" style="border-color: #6ee7b7;">
+          <p class="card-title" style="color: #10b981;">إجمالي الإضافي</p>
+          <p class="card-value" style="color: #059669;">+${formatCurrency(rangeOvertimePay)}</p>
+          <p class="card-desc">أجور العمل الإضافي للفترة</p>
+        </div>
+        <div class="card" style="border-color: #fca5a5;">
+          <p class="card-title" style="color: #ef4444;">إجمالي الخصومات</p>
+          <p class="card-value" style="color: #dc2626;">-${formatCurrency(rangeDeductions)}</p>
+          <p class="card-desc">الغياب والتأخير للفترة</p>
+        </div>
+        <div class="card" style="background-color: #eff6ff; border-color: #93c5fd;">
+          <p class="card-title" style="color: #2563eb;">صافي المستحقات</p>
+          <p class="card-value" style="color: #1d4ed8;">${formatCurrency(rangeNetSalary)}</p>
+          <p class="card-desc">صافي الراتب المستحق للفترة</p>
+        </div>
+        <div class="card" style="border-color: #cbd5e1;">
+          <p class="card-title" style="color: #475569;">إجمالي المقبوض</p>
+          <p class="card-value" style="color: #334155;">${formatCurrency(rangeTotalPaid)}</p>
+          <p class="card-desc">مجموع السُلف والدفعات</p>
+        </div>
+        <div class="card" style="background-color: ${remainingBg}; border-color: ${remainingBorder};">
+          <p class="card-title" style="color: ${remainingTextColor};">${remainingTitle}</p>
+          <p class="card-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(rangeBalance))}</p>
+          <p class="card-desc" style="color: ${remainingTextColor};">الرصيد المتبقي الإجمالي</p>
+        </div>
+      </div>
+
+      <h2 class="section-title">ملخص كشف الرواتب الشهري</h2>
+      <table class="table-container" style="margin-bottom: 25px;">
+        <thead>
+          <tr>
+            <th style="width: 20%">الشهر</th>
+            <th style="width: 20%">الراتب الأساسي</th>
+            <th style="width: 20%">مستحقات الإضافي</th>
+            <th style="width: 20%">الخصومات</th>
+            <th style="width: 20%">صافي الراتب المستحق</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${monthlyRowsHtml}
+        </tbody>
+      </table>
+
+      <h2 class="section-title">تفاصيل الدفعات المالية والسُلف المستلمة</h2>
+      <table class="table-container" style="margin-bottom: 25px; max-width: 650px;">
+        <thead>
+          <tr style="background-color: #475569;">
+            <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">التاريخ</th>
+            <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 50%">البيان / الملاحظة</th>
+            <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">المبلغ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${paymentsRowsHtml}
+        </tbody>
+      </table>
+
+      <div class="signature-section">
+        <div class="signature-box">
+          <p>توقيع الموظف</p>
+          <div class="signature-line"></div>
+        </div>
+        <div class="signature-box">
+          <p>المحاسب المسؤول</p>
+          <div class="signature-line"></div>
+        </div>
+        <div class="signature-box">
+          <p>توقيع المدير العام</p>
+          <div class="signature-line"></div>
         </div>
       </div>
     </body>
