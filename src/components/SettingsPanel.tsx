@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSalary } from '../context/SalaryContext';
-import { Settings, Info, RefreshCw, X, ShieldAlert, Check } from 'lucide-react';
+import { Settings, Info, RefreshCw, X, ShieldAlert, Check, Calendar } from 'lucide-react';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     calculationResult,
     year,
     month,
+    monthlySalaries,
     updateMonthlySalary,
     clearMonthlySalary
   } = useSalary();
@@ -25,16 +26,29 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [googleApiKey, setGoogleApiKey] = useState(settings.googleApiKey);
   const [showSavedToast, setShowSavedToast] = useState(false);
 
-  // Custom Monthly Salary state
-  const [hasCustomSalary, setHasCustomSalary] = useState(calculationResult.customMonthSalary !== undefined);
-  const [customSalaryVal, setCustomSalaryVal] = useState(calculationResult.customMonthSalary || settings.baseSalary);
+  // Local state to store monthly overrides for the year
+  const [localMonthlySalaries, setLocalMonthlySalaries] = useState<{ [key: string]: number }>({});
+
+  const monthNames = [
+    '1 - كانون الثاني',
+    '2 - شباط',
+    '3 - آذار',
+    '4 - نيسان',
+    '5 - أيار',
+    '6 - حزيران',
+    '7 - تموز',
+    '8 - آب',
+    '9 - أيلول',
+    '10 - تشرين الأول',
+    '11 - تشرين الثاني',
+    '12 - كانون الأول',
+  ];
 
   // Sync state with selected month/year context changes
   useEffect(() => {
-    setHasCustomSalary(calculationResult.customMonthSalary !== undefined);
-    setCustomSalaryVal(calculationResult.customMonthSalary || settings.baseSalary);
+    setLocalMonthlySalaries({ ...monthlySalaries });
     setBaseSalary(settings.baseSalary);
-  }, [calculationResult.customMonthSalary, settings.baseSalary, year, month]);
+  }, [monthlySalaries, settings.baseSalary, year, month]);
 
   if (!isOpen) return null;
 
@@ -49,11 +63,19 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       googleApiKey: googleApiKey.trim(),
     });
 
-    // Save custom monthly salary override
-    if (hasCustomSalary) {
-      await updateMonthlySalary(Number(customSalaryVal));
-    } else {
-      await clearMonthlySalary();
+    // Save custom monthly salaries for all 12 months of the current year
+    for (let mIdx = 0; mIdx < 12; mIdx++) {
+      const key = `${year}-${mIdx}`;
+      const localVal = localMonthlySalaries[key];
+      const remoteVal = monthlySalaries[key];
+      
+      if (localVal !== remoteVal) {
+        if (localVal === undefined || isNaN(localVal)) {
+          await clearMonthlySalary(year, mIdx);
+        } else {
+          await updateMonthlySalary(Number(localVal), year, mIdx);
+        }
+      }
     }
 
     setShowSavedToast(true);
@@ -148,37 +170,70 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                   </p>
                 </div>
 
-                {/* Custom Month Salary Override Toggle & Input */}
-                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 cursor-pointer" htmlFor="toggle-custom-salary">
-                      تحديد راتب مخصص لهذا الشهر فقط ({month + 1} / {year})
-                    </label>
-                    <input
-                      id="toggle-custom-salary"
-                      type="checkbox"
-                      checked={hasCustomSalary}
-                      onChange={(e) => setHasCustomSalary(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                    />
-                  </div>
+                {/* Custom Salaries List for the Selected Year */}
+                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-850 space-y-4">
+                  <h3 className="text-xs font-bold text-slate-455 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-indigo-500" />
+                    رواتب أشهر سنة {year} المخصصة
+                  </h3>
                   
-                  {hasCustomSalary && (
-                    <div className="space-y-2 animate-fade-in">
-                      <input
-                        type="number"
-                        value={customSalaryVal}
-                        onChange={(e) => setCustomSalaryVal(Number(e.target.value))}
-                        min="0"
-                        required
-                        placeholder="الراتب المخصص لهذا الشهر"
-                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-semibold text-sm"
-                      />
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                        سيتم تطبيق هذا الراتب فقط على شهر {month + 1} من عام {year}. بقية الأشهر ستعتمد الراتب الافتراضي.
-                      </p>
-                    </div>
-                  )}
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                    يمكنك تحديد راتب مخصص لكل شهر من أشهر السنة منفصلاً. ترك الحقل فارغاً سيعتمد الراتب الافتراضي العام أعلاه تلقائياً.
+                  </p>
+
+                  <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                    {monthNames.map((mName, mIdx) => {
+                      const key = `${year}-${mIdx}`;
+                      const hasCustom = localMonthlySalaries[key] !== undefined;
+                      const currentVal = hasCustom ? localMonthlySalaries[key] : '';
+                      
+                      return (
+                        <div key={mIdx} className="flex items-center gap-2.5 justify-between">
+                          <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 w-1/3">
+                            {mName}
+                          </span>
+                          
+                          <div className="flex-1 flex items-center gap-1">
+                            <input
+                              type="number"
+                              value={currentVal}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                  const updated = { ...localMonthlySalaries };
+                                  delete updated[key];
+                                  setLocalMonthlySalaries(updated);
+                                } else {
+                                  setLocalMonthlySalaries({
+                                    ...localMonthlySalaries,
+                                    [key]: Number(val),
+                                  });
+                                }
+                              }}
+                              placeholder={`${baseSalary} TRY`}
+                              min="0"
+                              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all font-semibold text-[11px] text-left"
+                            />
+                            
+                            {hasCustom && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = { ...localMonthlySalaries };
+                                  delete updated[key];
+                                  setLocalMonthlySalaries(updated);
+                                }}
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                title="إعادة تعيين للافتراضي"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Overtime Multiplier Weekday/Sat */}

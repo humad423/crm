@@ -29,8 +29,8 @@ interface SalaryContextType {
   // Custom salary and payments additions
   monthlySalaries: { [key: string]: number };
   payments: Payment[];
-  updateMonthlySalary: (salary: number) => Promise<void>;
-  clearMonthlySalary: () => Promise<void>;
+  updateMonthlySalary: (salary: number, targetYear?: number, targetMonth?: number) => Promise<void>;
+  clearMonthlySalary: (targetYear?: number, targetMonth?: number) => Promise<void>;
   addPayment: (payment: { date: string; amount: number; note?: string }) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
 }
@@ -494,16 +494,18 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     fetchHolidays();
   }, [year, settings.googleApiKey]);
 
-  const updateMonthlySalary = async (salary: number) => {
-    const key = `${year}-${month}`;
+  const updateMonthlySalary = async (salary: number, targetYear?: number, targetMonth?: number) => {
+    const y = targetYear !== undefined ? targetYear : year;
+    const m = targetMonth !== undefined ? targetMonth : month;
+    const key = `${y}-${m}`;
     const updated = { ...monthlySalaries, [key]: salary };
     setMonthlySalaries(updated);
 
     if (user) {
       await supabase.from('monthly_salaries').upsert({
         user_id: user.id,
-        year,
-        month,
+        year: y,
+        month: m,
         base_salary: salary,
       });
     } else {
@@ -511,14 +513,16 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const clearMonthlySalary = async () => {
-    const key = `${year}-${month}`;
+  const clearMonthlySalary = async (targetYear?: number, targetMonth?: number) => {
+    const y = targetYear !== undefined ? targetYear : year;
+    const m = targetMonth !== undefined ? targetMonth : month;
+    const key = `${y}-${m}`;
     const updated = { ...monthlySalaries };
     delete updated[key];
     setMonthlySalaries(updated);
 
     if (user) {
-      await supabase.from('monthly_salaries').delete().eq('user_id', user.id).eq('year', year).eq('month', month);
+      await supabase.from('monthly_salaries').delete().eq('user_id', user.id).eq('year', y).eq('month', m);
     } else {
       localStorage.setItem('salary_monthly_salaries', JSON.stringify(updated));
     }
