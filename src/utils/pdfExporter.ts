@@ -195,35 +195,37 @@ export function exportMonthToPDF(
           color: #475569;
           margin: 2px 0;
         }
-        .summary-grid {
-          display: grid;
-          grid-template-cols: repeat(5, 1fr);
-          gap: 12px;
-          margin-bottom: 25px;
+        .summary-footer {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 20px;
+          padding-top: 14px;
+          border-top: 2px solid #e2e8f0;
         }
-        .card {
+        .summary-pill {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          padding: 12px;
+          border-radius: 8px;
+          padding: 6px 12px;
           background-color: #f8fafc;
+          min-width: 100px;
+          flex: 1;
         }
-        .card-title {
-          font-size: 10px;
-          font-weight: bold;
+        .pill-label {
+          font-size: 9px;
+          font-weight: 600;
           color: #64748b;
-          margin: 0 0 5px 0;
           text-transform: uppercase;
+          letter-spacing: 0.3px;
+          margin-bottom: 3px;
         }
-        .card-value {
-          font-size: 15px;
+        .pill-value {
+          font-size: 12px;
           font-weight: 700;
           color: #0f172a;
-          margin: 0;
-        }
-        .card-desc {
-          font-size: 9px;
-          color: #64748b;
-          margin: 5px 0 0 0;
         }
         .section-title {
           font-size: 13px;
@@ -261,33 +263,7 @@ export function exportMonthToPDF(
         </div>
       </div>
 
-      <div class="summary-grid">
-        <div class="card">
-          <p class="card-title">${t.baseSalary}</p>
-          <p class="card-value">${formatCurrency(calculationResult.baseSalary)}</p>
-          <p class="card-desc">${isCustomSalary ? t.overtimeDay + ' ' + t.baseSalary : t.contractualSalary}</p>
-        </div>
-        <div class="card" style="border-color: #fca5a5;">
-          <p class="card-title" style="color: #ef4444;">${t.totalDeductions}</p>
-          <p class="card-value" style="color: #dc2626;">-${formatCurrency(totalDeductions)}</p>
-          <p class="card-desc" style="color: #ef4444;">${t.absences}: ${calculationResult.totalAbsenceDays} ${t.days} | ${t.delays}: ${calculationResult.totalDelayHours}${t.hours}</p>
-        </div>
-        <div class="card" style="border-color: #6ee7b7;">
-          <p class="card-title" style="color: #10b981;">${t.overtimePay}</p>
-          <p class="card-value" style="color: #059669;">+${formatCurrency(calculationResult.totalOvertimePay)}</p>
-          <p class="card-desc" style="color: #10b981;">${t.totalOvertimeHours}: ${totalOvertimeHours.toFixed(1)}${t.hours}</p>
-        </div>
-        <div class="card" style="background-color: #eff6ff; border-color: #93c5fd;">
-          <p class="card-title" style="color: #2563eb;">${t.netSalaryDue}</p>
-          <p class="card-value" style="color: #1d4ed8;">${formatCurrency(calculationResult.netSalary)}</p>
-          <p class="card-desc" style="color: #2563eb;">${t.salaryAfterDeductions}</p>
-        </div>
-        <div class="card" style="background-color: ${remainingBg}; border-color: ${remainingBorder};">
-          <p class="card-title" style="color: ${remainingTextColor};">${remainingTitle}</p>
-          <p class="card-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(remaining))}</p>
-          <p class="card-desc" style="color: ${remainingTextColor};">${t.totalReceived}: ${formatCurrency(calculationResult.totalPaymentsReceived)}</p>
-        </div>
-      </div>
+
 
       <div style="display: grid; grid-template-cols: 2fr 1fr; gap: 20px; margin-bottom: 25px; align-items: start;">
         <div>
@@ -331,6 +307,28 @@ export function exportMonthToPDF(
         </tbody>
       </table>
 
+      <div class="summary-footer">
+        <div class="summary-pill">
+          <span class="pill-label">${t.baseSalary}</span>
+          <span class="pill-value">${formatCurrency(calculationResult.baseSalary)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: #fca5a5;">
+          <span class="pill-label" style="color: #ef4444;">${t.totalDeductions}</span>
+          <span class="pill-value" style="color: #dc2626;">-${formatCurrency(totalDeductions)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: #6ee7b7;">
+          <span class="pill-label" style="color: #10b981;">${t.overtimePay}</span>
+          <span class="pill-value" style="color: #059669;">+${formatCurrency(calculationResult.totalOvertimePay)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: #93c5fd; background-color: #eff6ff;">
+          <span class="pill-label" style="color: #2563eb;">${t.netSalaryDue}</span>
+          <span class="pill-value" style="color: #1d4ed8;">${formatCurrency(calculationResult.netSalary)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: ${remainingBorder}; background-color: ${remainingBg};">
+          <span class="pill-label" style="color: ${remainingTextColor};">${remainingTitle}</span>
+          <span class="pill-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(remaining))}</span>
+        </div>
+      </div>
     </body>
     </html>
   `);
@@ -530,36 +528,37 @@ export function exportRangeToPDF(
           color: #475569;
           margin: 2px 0;
         }
-        .summary-grid {
-          display: grid;
-          grid-template-cols: repeat(6, 1fr);
-          gap: 10px;
-          margin-bottom: 25px;
+        .summary-footer {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 20px;
+          padding-top: 14px;
+          border-top: 2px solid #e2e8f0;
         }
-        .card {
+        .summary-pill {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           border: 1px solid #e2e8f0;
-          border-radius: 12px;
-          padding: 10px;
+          border-radius: 8px;
+          padding: 6px 12px;
           background-color: #f8fafc;
-          text-align: center;
+          min-width: 90px;
+          flex: 1;
         }
-        .card-title {
+        .pill-label {
           font-size: 9px;
-          font-weight: bold;
+          font-weight: 600;
           color: #64748b;
-          margin: 0 0 5px 0;
           text-transform: uppercase;
+          letter-spacing: 0.3px;
+          margin-bottom: 3px;
         }
-        .card-value {
-          font-size: 14px;
+        .pill-value {
+          font-size: 12px;
           font-weight: 700;
           color: #0f172a;
-          margin: 0;
-        }
-        .card-desc {
-          font-size: 8px;
-          color: #64748b;
-          margin: 5px 0 0 0;
         }
         .section-title {
           font-size: 13px;
@@ -596,38 +595,7 @@ export function exportRangeToPDF(
         </div>
       </div>
 
-      <div class="summary-grid">
-        <div class="card">
-          <p class="card-title">${t.totalBaseSalaries}</p>
-          <p class="card-value">${formatCurrency(rangeBaseSalary)}</p>
-          <p class="card-desc">${t.totalBaseSalaries}</p>
-        </div>
-        <div class="card" style="border-color: #6ee7b7;">
-          <p class="card-title" style="color: #10b981;">${t.totalOvertimePay}</p>
-          <p class="card-value" style="color: #059669;">+${formatCurrency(rangeOvertimePay)}</p>
-          <p class="card-desc">${t.overtimePay}</p>
-        </div>
-        <div class="card" style="border-color: #fca5a5;">
-          <p class="card-title" style="color: #ef4444;">${t.totalDeductions}</p>
-          <p class="card-value" style="color: #dc2626;">-${formatCurrency(rangeDeductions)}</p>
-          <p class="card-desc">${t.absences}/${t.delays}</p>
-        </div>
-        <div class="card" style="background-color: #eff6ff; border-color: #93c5fd;">
-          <p class="card-title" style="color: #2563eb;">${t.netDue}</p>
-          <p class="card-value" style="color: #1d4ed8;">${formatCurrency(rangeNetSalary)}</p>
-          <p class="card-desc">${t.totalNetDueEarned}</p>
-        </div>
-        <div class="card" style="border-color: #cbd5e1;">
-          <p class="card-title" style="color: #475569;">${t.totalReceived}</p>
-          <p class="card-value" style="color: #334155;">${formatCurrency(rangeTotalPaid)}</p>
-          <p class="card-desc">${t.advancesAndPayments}</p>
-        </div>
-        <div class="card" style="background-color: ${remainingBg}; border-color: ${remainingBorder};">
-          <p class="card-title" style="color: ${remainingTextColor};">${remainingTitle}</p>
-          <p class="card-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(rangeBalance))}</p>
-          <p class="card-desc" style="color: ${remainingTextColor};">${t.totalRemainingBalance}</p>
-        </div>
-      </div>
+
 
       <div style="display: grid; grid-template-cols: 2fr 1fr; gap: 20px; margin-bottom: 25px; align-items: start;">
         <div>
@@ -683,6 +651,32 @@ export function exportRangeToPDF(
         </div>
       </div>
 
+      <div class="summary-footer">
+        <div class="summary-pill">
+          <span class="pill-label">${t.totalBaseSalaries}</span>
+          <span class="pill-value">${formatCurrency(rangeBaseSalary)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: #6ee7b7;">
+          <span class="pill-label" style="color: #10b981;">${t.totalOvertimePay}</span>
+          <span class="pill-value" style="color: #059669;">+${formatCurrency(rangeOvertimePay)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: #fca5a5;">
+          <span class="pill-label" style="color: #ef4444;">${t.totalDeductions}</span>
+          <span class="pill-value" style="color: #dc2626;">-${formatCurrency(rangeDeductions)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: #93c5fd; background-color: #eff6ff;">
+          <span class="pill-label" style="color: #2563eb;">${t.netDue}</span>
+          <span class="pill-value" style="color: #1d4ed8;">${formatCurrency(rangeNetSalary)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: #cbd5e1;">
+          <span class="pill-label" style="color: #475569;">${t.totalReceived}</span>
+          <span class="pill-value" style="color: #334155;">${formatCurrency(rangeTotalPaid)}</span>
+        </div>
+        <div class="summary-pill" style="border-color: ${remainingBorder}; background-color: ${remainingBg};">
+          <span class="pill-label" style="color: ${remainingTextColor};">${remainingTitle}</span>
+          <span class="pill-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(rangeBalance))}</span>
+        </div>
+      </div>
     </body>
     </html>
   `);
