@@ -3,7 +3,7 @@ import { useSalary } from '../context/SalaryContext';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, Coins, Clock, Calendar } from 'lucide-react';
 
 export default function MetricCards() {
-  const { calculationResult } = useSalary();
+  const { calculationResult, cumulativeBalance, cumulativeTotalEarned, cumulativeTotalPaid } = useSalary();
   
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('tr-TR', {
@@ -17,7 +17,7 @@ export default function MetricCards() {
   const totalOvertimeHours = calculationResult.overtime1xHours + calculationResult.overtime1_5xHours + calculationResult.overtime2xHours;
 
   const isCustomSalary = calculationResult.customMonthSalary !== undefined;
-  const remaining = calculationResult.remainingBalance;
+  const remaining = cumulativeBalance;
   
   let remainingTitle = 'الرصيد المتبقي (مستوفى)';
   let remainingColorClass = 'from-slate-500/10 to-slate-650/10 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800/80';
@@ -85,7 +85,7 @@ export default function MetricCards() {
     {
       title: remainingTitle,
       value: formatCurrency(Math.abs(remaining)),
-      description: `إجمالي المقبوض: ${formatCurrency(calculationResult.totalPaymentsReceived)}`,
+      description: `الرواتب: ${formatCurrency(cumulativeTotalEarned)} | المقبوض: ${formatCurrency(cumulativeTotalPaid)}`,
       icon: Calendar,
       colorClass: remainingColorClass,
       gradient: remainingGradient,
