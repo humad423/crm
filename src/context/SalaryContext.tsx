@@ -600,18 +600,25 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     currentMonthPayments,
   };
 
-  // ── Cumulative balance — simple flat approach ───────────────────────────────
+  // ── Cumulative balance — complete approach ──────────────────────────────────
   // Always compute up to TODAY's real month (not the dashboard-selected month).
   // For every month from January up to the current real month (inclusive),
-  // use the custom salary if one is set, otherwise the global base salary.
+  // calculate the full net salary including all overtime, absences, and delays.
   const today = new Date();
   const realYear = today.getFullYear();
   const realMonth = today.getMonth(); // 0-based
 
   let cumulativeTotalEarned = 0;
   for (let m = 0; m <= realMonth; m++) {
-    const key = `${realYear}-${m}`;
-    cumulativeTotalEarned += monthlySalaries[key] ?? settings.baseSalary;
+    const monthExceptions = exceptions.filter((e) => {
+      const [ey, em] = e.date.split('-').map(Number);
+      return ey === realYear && (em - 1) === m;
+    });
+    const customMonthlySalary = monthlySalaries[`${realYear}-${m}`];
+    
+    // Calculate full month breakdown including overtime & deductions
+    const monthResult = calculateMonthlySalary(realYear, m, settings, monthExceptions, holidays, customMonthlySalary);
+    cumulativeTotalEarned += monthResult.netSalary;
   }
 
   // Total paid = every payment ever recorded (across all dates/years)
