@@ -245,22 +245,7 @@ export function exportMonthToPDF(
           padding: 8px;
           border: 1px solid #1e3a8a;
         }
-        .signature-section {
-          margin-top: 40px;
-          display: flex;
-          justify-content: space-between;
-          padding: 0 40px;
-          font-size: 12px;
-        }
-        .signature-box {
-          text-align: center;
-          width: 150px;
-        }
-        .signature-line {
-          border-bottom: 1px solid #475569;
-          margin-top: 40px;
-          margin-bottom: 5px;
-        }
+
       </style>
     </head>
     <body>
@@ -346,22 +331,6 @@ export function exportMonthToPDF(
         </tbody>
       </table>
 
-      <div class="signature-section">
-        <div class="signature-box">
-          <p>${t.employeeSignature}</p>
-          <div class="signature-line"></div>
-          <p style="font-size: 9px; color: #64748b;">${t.agreeToInfo}</p>
-        </div>
-        <div class="signature-box">
-          <p>${t.accountant}</p>
-          <div class="signature-line"></div>
-        </div>
-        <div class="signature-box">
-          <p>${t.managerSignature}</p>
-          <div class="signature-line"></div>
-          <p style="font-size: 9px; color: #64748b;">${t.approvedForPayment}</p>
-        </div>
-      </div>
     </body>
     </html>
   `);
@@ -612,22 +581,6 @@ export function exportRangeToPDF(
           padding: 8px;
           border: 1px solid #1e3a8a;
         }
-        .signature-section {
-          margin-top: 40px;
-          display: flex;
-          justify-content: space-between;
-          padding: 0 40px;
-          font-size: 12px;
-        }
-        .signature-box {
-          text-align: center;
-          width: 150px;
-        }
-        .signature-line {
-          border-bottom: 1px solid #475569;
-          margin-top: 40px;
-          margin-bottom: 5px;
-        }
       </style>
     </head>
     <body>
@@ -730,20 +683,6 @@ export function exportRangeToPDF(
         </div>
       </div>
 
-      <div class="signature-section">
-        <div class="signature-box">
-          <p>${t.employeeSignature}</p>
-          <div class="signature-line"></div>
-        </div>
-        <div class="signature-box">
-          <p>${t.accountant}</p>
-          <div class="signature-line"></div>
-        </div>
-        <div class="signature-box">
-          <p>${t.managerSignature}</p>
-          <div class="signature-line"></div>
-        </div>
-      </div>
     </body>
     </html>
   `);
