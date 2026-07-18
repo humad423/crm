@@ -1,5 +1,6 @@
 import { DayBreakdown, MonthlyCalculationResult, UserSettings, ExceptionEvent, Payment, Holiday } from '../types/salary';
 import { calculateMonthlySalary } from './salaryCalculator';
+import { ReportLang, reportTranslations } from './translations';
 
 /**
  * Generates and prints a professional PDF report of the monthly salary calculation.
@@ -11,9 +12,16 @@ export function exportMonthToPDF(
   settings: UserSettings,
   calculationResult: MonthlyCalculationResult,
   dayBreakdowns: DayBreakdown[],
-  exceptions: ExceptionEvent[]
+  exceptions: ExceptionEvent[],
+  lang: ReportLang = 'ar'
 ) {
-  const daysOfWeek = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const t = reportTranslations[lang];
+  const isRtl = lang === 'ar';
+  
+  const daysOfWeekAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const daysOfWeekEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const daysOfWeekTr = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+  const daysOfWeek = lang === 'ar' ? daysOfWeekAr : (lang === 'tr' ? daysOfWeekTr : daysOfWeekEn);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('tr-TR', {
@@ -29,18 +37,18 @@ export function exportMonthToPDF(
   const isCustomSalary = calculationResult.customMonthSalary !== undefined;
   const remaining = calculationResult.remainingBalance;
 
-  let remainingTitle = 'الرصيد المتبقي (مستوفى)';
+  let remainingTitle = t.remainingBalanceSettled;
   let remainingBg = '#f8fafc';
   let remainingBorder = '#e2e8f0';
   let remainingTextColor = '#0f172a';
   
   if (remaining > 0) {
-    remainingTitle = 'الرصيد المتبقي (لك)';
+    remainingTitle = t.remainingBalanceToYou;
     remainingBg = '#f0fdf4';
     remainingBorder = '#6ee7b7';
     remainingTextColor = '#15803d';
   } else if (remaining < 0) {
-    remainingTitle = 'الرصيد المتبقي (عليك)';
+    remainingTitle = t.remainingBalanceFromYou;
     remainingBg = '#fef2f2';
     remainingBorder = '#fca5a5';
     remainingTextColor = '#b91c1c';
@@ -67,18 +75,18 @@ export function exportMonthToPDF(
     const dayName = daysOfWeek[dateObj.getDay()];
     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
-    let dayTypeLabel = 'يوم عمل';
-    if (day.isHoliday) dayTypeLabel = `عطلة: ${day.holidayName || ''}`;
-    else if (isWeekend) dayTypeLabel = 'عطلة أسبوعية';
+    let dayTypeLabel = t.regularDay;
+    if (day.isHoliday) dayTypeLabel = `${t.holidayDay}: ${day.holidayName || ''}`;
+    else if (isWeekend) dayTypeLabel = t.weekendDay;
 
     let exceptionLabel = '-';
-    if (day.absenceDays > 0) exceptionLabel = 'غياب كامل';
-    else if (day.delayHours > 0) exceptionLabel = `تأخير ${day.delayHours}س`;
-    else if (day.flatOvertimeHours > 0) exceptionLabel = `إضافي ${day.flatOvertimeHours}س (1.0x)`;
+    if (day.absenceDays > 0) exceptionLabel = t.absenceDay;
+    else if (day.delayHours > 0) exceptionLabel = `${t.delayDay} ${day.delayHours}${t.hours}`;
+    else if (day.flatOvertimeHours > 0) exceptionLabel = `${t.flatOvertimeHours}${t.hours} (1.0x)`;
     else if ((day.weekdayOvertimeHours + day.saturdayOvertimeHours) > 0) {
-      exceptionLabel = `إضافي ${(day.weekdayOvertimeHours + day.saturdayOvertimeHours)}س (1.5x)`;
+      exceptionLabel = `${(day.weekdayOvertimeHours + day.saturdayOvertimeHours)}${t.hours} (1.5x)`;
     } else if (day.sundayHolidayOvertimeHours > 0) {
-      exceptionLabel = `إضافي ${day.sundayHolidayOvertimeHours}س (2.0x)`;
+      exceptionLabel = `${day.sundayHolidayOvertimeHours}${t.hours} (2.0x)`;
     }
 
     // Retrieve note from exception events of this day
@@ -92,8 +100,8 @@ export function exportMonthToPDF(
         <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 600;">${d}/${m}/${y}</td>
         <td style="padding: 6px; border: 1px solid #e2e8f0;">${dayName}</td>
         <td style="padding: 6px; border: 1px solid #e2e8f0; font-size: 10px; color: #475569;">${dayTypeLabel}</td>
-        <td style="padding: 6px; border: 1px solid #e2e8f0;">${day.defaultScheduledHours}س</td>
-        <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 500;">${day.actualWeekdayHoursWorked}س</td>
+        <td style="padding: 6px; border: 1px solid #e2e8f0;">${day.defaultScheduledHours}${t.hours}</td>
+        <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 500;">${day.actualWeekdayHoursWorked}${t.hours}</td>
         <td style="padding: 6px; border: 1px solid #e2e8f0; font-size: 11px; font-weight: bold; color: ${day.absenceDays > 0 ? '#e11d48' : (day.delayHours > 0 ? '#d97706' : '#10b981')};">${exceptionLabel}</td>
         <td style="padding: 6px; border: 1px solid #e2e8f0; font-size: 10px; color: #64748b;">${noteText}</td>
       </tr>
@@ -106,15 +114,15 @@ export function exportMonthToPDF(
     weeklyHtml += `
       <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background-color: #f8fafc; font-size: 11px;">
         <div style="font-weight: bold; color: #1e293b; margin-bottom: 5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; display: flex; justify-content: space-between;">
-          <span>${week.weekLabel}</span>
-          <span style="color: ${week.deficitHours > 0 ? '#d97706' : '#10b981'}">${week.deficitHours > 0 ? `عجز: ${week.deficitHours}س` : 'مكتمل (45س)'}</span>
+          <span>${t.week} ${week.weekIndex}</span>
+          <span style="color: ${week.deficitHours > 0 ? '#d97706' : '#10b981'}">${week.deficitHours > 0 ? `${t.deficit}: ${week.deficitHours}${t.hours}` : t.completed}</span>
         </div>
-        <div style="margin-bottom: 4px;">الساعات الفعلية: <b>${week.actualWeekdayHours}س / ${week.expectedHours}س</b></div>
-        <div style="margin-bottom: 4px;">الغيابات/التأخير: <b>${week.absenceDeductions} غ | ${week.delayHours}س</b></div>
+        <div style="margin-bottom: 4px;">${t.actualHoursLabel}: <b>${week.actualWeekdayHours}${t.hours} / ${week.expectedHours}${t.hours}</b></div>
+        <div style="margin-bottom: 4px;">${t.absences}/${t.delays}: <b>${week.absenceDeductions} غ | ${week.delayHours}${t.hours}</b></div>
         <div style="border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-top: 4px;">
-          <div>إضافي 1.0x: <b>${week.overtimeHours1x}س</b></div>
-          <div>إضافي 1.5x: <b>${week.overtimeHours1_5x}س</b></div>
-          <div>إضافي 2.0x: <b>${week.overtimeHours2x}س</b></div>
+          <div>1.0x: <b>${week.overtimeHours1x}س</b></div>
+          <div>1.5x: <b>${week.overtimeHours1_5x}س</b></div>
+          <div>2.0x: <b>${week.overtimeHours2x}س</b></div>
         </div>
       </div>
     `;
@@ -127,7 +135,7 @@ export function exportMonthToPDF(
     paymentsRowsHtml = `
       <tr>
         <td colspan="3" style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 11px;">
-          لا توجد أي سُلف أو دفعات مسجلة لهذا الشهر.
+          ${t.noPaymentsMonthly}
         </td>
       </tr>
     `;
@@ -137,7 +145,7 @@ export function exportMonthToPDF(
       paymentsRowsHtml += `
         <tr style="text-align: center; font-size: 11px;">
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 600;">${d}/${m}/${y}</td>
-          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: right;">${p.note || '-'}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: ${isRtl ? 'right' : 'left'};">${p.note || '-'}</td>
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold; color: #059669;">${formatCurrency(p.amount)}</td>
         </tr>
       `;
@@ -148,16 +156,16 @@ export function exportMonthToPDF(
   iframeDoc.open();
   iframeDoc.write(`
     <!DOCTYPE html>
-    <html dir="rtl" lang="ar">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${lang}">
     <head>
       <meta charset="utf-8">
-      <title>تقرير الرواتب - ${monthName} ${year}</title>
+      <title>${t.reportTitleMonthly} - ${monthName} ${year}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
       <style>
         body {
-          font-family: 'Cairo', sans-serif;
+          font-family: ${isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif"};
           margin: 0;
           padding: 20px;
           color: #0f172a;
@@ -166,9 +174,6 @@ export function exportMonthToPDF(
         @media print {
           body {
             padding: 0;
-          }
-          .no-print {
-            display: none;
           }
         }
         .header {
@@ -224,8 +229,8 @@ export function exportMonthToPDF(
           font-size: 13px;
           font-weight: 700;
           color: #1e293b;
-          border-right: 3px solid #6366f1;
-          padding-right: 8px;
+          border-${isRtl ? 'right' : 'left'}: 3px solid #6366f1;
+          padding-${isRtl ? 'right' : 'left'}: 8px;
           margin: 20px 0 10px 0;
         }
         .table-container {
@@ -261,59 +266,59 @@ export function exportMonthToPDF(
     <body>
       <div class="header">
         <div>
-          <h1 class="title">تقرير حساب الرواتب والأجور الشهرية</h1>
-          <p class="meta-text" style="font-weight: bold;">الفترة المحاسبية: ${monthName} / ${year}</p>
-          <p class="meta-text">قواعد الحساب: قانون العمل التركي (45 ساعة أسبوعية / 225 ساعة شهرية)</p>
+          <h1 class="title">${t.reportTitleMonthly}</h1>
+          <p class="meta-text" style="font-weight: bold;">${t.accountingPeriod}: ${monthName} / ${year}</p>
+          <p class="meta-text">${t.calculationRules}</p>
         </div>
-        <div style="text-align: left;">
-          <p class="meta-text" style="font-weight: bold; font-size: 13px; color: #1e3a8a;">برنامج إدارة الأجور crm</p>
-          <p class="meta-text">تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-EG')}</p>
+        <div style="text-align: ${isRtl ? 'left' : 'right'};">
+          <p class="meta-text" style="font-weight: bold; font-size: 13px; color: #1e3a8a;">${t.crmSystem}</p>
+          <p class="meta-text">${t.exportDate}: ${new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'tr-TR')}</p>
         </div>
       </div>
 
       <div class="summary-grid">
         <div class="card">
-          <p class="card-title">الراتب الأساسي</p>
+          <p class="card-title">${t.baseSalary}</p>
           <p class="card-value">${formatCurrency(calculationResult.baseSalary)}</p>
-          <p class="card-desc">${isCustomSalary ? 'راتب مخصص للشهر' : 'الراتب التعاقدي العام'}</p>
+          <p class="card-desc">${isCustomSalary ? t.overtimeDay + ' ' + t.baseSalary : t.contractualSalary}</p>
         </div>
         <div class="card" style="border-color: #fca5a5;">
-          <p class="card-title" style="color: #ef4444;">إجمالي الخصومات</p>
+          <p class="card-title" style="color: #ef4444;">${t.totalDeductions}</p>
           <p class="card-value" style="color: #dc2626;">-${formatCurrency(totalDeductions)}</p>
-          <p class="card-desc" style="color: #ef4444;">غياب: ${calculationResult.totalAbsenceDays} أيام | تأخير: ${calculationResult.totalDelayHours}س</p>
+          <p class="card-desc" style="color: #ef4444;">${t.absences}: ${calculationResult.totalAbsenceDays} ${t.days} | ${t.delays}: ${calculationResult.totalDelayHours}${t.hours}</p>
         </div>
         <div class="card" style="border-color: #6ee7b7;">
-          <p class="card-title" style="color: #10b981;">مستحقات الإضافي</p>
+          <p class="card-title" style="color: #10b981;">${t.overtimePay}</p>
           <p class="card-value" style="color: #059669;">+${formatCurrency(calculationResult.totalOvertimePay)}</p>
-          <p class="card-desc" style="color: #10b981;">إجمالي ساعات العمل الإضافي: ${totalOvertimeHours.toFixed(1)}س</p>
+          <p class="card-desc" style="color: #10b981;">${t.totalOvertimeHours}: ${totalOvertimeHours.toFixed(1)}${t.hours}</p>
         </div>
         <div class="card" style="background-color: #eff6ff; border-color: #93c5fd;">
-          <p class="card-title" style="color: #2563eb;">صافي الراتب المستحق</p>
+          <p class="card-title" style="color: #2563eb;">${t.netSalaryDue}</p>
           <p class="card-value" style="color: #1d4ed8;">${formatCurrency(calculationResult.netSalary)}</p>
-          <p class="card-desc" style="color: #2563eb;">الراتب بعد الخصومات والإضافي</p>
+          <p class="card-desc" style="color: #2563eb;">${t.salaryAfterDeductions}</p>
         </div>
         <div class="card" style="background-color: ${remainingBg}; border-color: ${remainingBorder};">
           <p class="card-title" style="color: ${remainingTextColor};">${remainingTitle}</p>
           <p class="card-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(remaining))}</p>
-          <p class="card-desc" style="color: ${remainingTextColor};">إجمالي المقبوض: ${formatCurrency(calculationResult.totalPaymentsReceived)}</p>
+          <p class="card-desc" style="color: ${remainingTextColor};">${t.totalReceived}: ${formatCurrency(calculationResult.totalPaymentsReceived)}</p>
         </div>
       </div>
 
       <div style="display: grid; grid-template-cols: 2fr 1fr; gap: 20px; margin-bottom: 25px; align-items: start;">
         <div>
-          <h2 class="section-title">ملخص المقاصة والتسوية الأسبوعية (Denkleştirme)</h2>
+          <h2 class="section-title">${t.weeklyEqualization}</h2>
           <div style="display: grid; grid-template-cols: repeat(5, 1fr); gap: 8px;">
             ${weeklyHtml}
           </div>
         </div>
         <div>
-          <h2 class="section-title">السلف والدفعات المقبوضة</h2>
+          <h2 class="section-title">${t.advancesReceived}</h2>
           <table class="table-container">
             <thead>
               <tr style="background-color: #475569;">
-                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 30%">التاريخ</th>
-                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 45%">البيان</th>
-                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">المبلغ</th>
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 30%">${t.date}</th>
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 45%">${t.description}</th>
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">${t.amount}</th>
               </tr>
             </thead>
             <tbody>
@@ -323,17 +328,17 @@ export function exportMonthToPDF(
         </div>
       </div>
 
-      <h2 class="section-title">سجل الحضور والعمل الإضافي اليومي الموثق</h2>
+      <h2 class="section-title">${t.dailyAttendanceLog}</h2>
       <table class="table-container">
         <thead>
           <tr>
-            <th style="width: 12%">التاريخ</th>
-            <th style="width: 10%">اليوم</th>
-            <th style="width: 20%">توصيف اليوم</th>
-            <th style="width: 12%">ساعات افتراضية</th>
-            <th style="width: 12%">ساعات فعلية</th>
-            <th style="width: 18%">الاستثناءات والعمل الإضافي</th>
-            <th style="width: 16%">الملاحظات</th>
+            <th style="width: 12%">${t.date}</th>
+            <th style="width: 10%">${t.day}</th>
+            <th style="width: 20%">${t.dayType}</th>
+            <th style="width: 12%">${t.scheduledHours}</th>
+            <th style="width: 12%">${t.actualHours}</th>
+            <th style="width: 18%">${t.exceptionsAndOvertime}</th>
+            <th style="width: 16%">${t.notes}</th>
           </tr>
         </thead>
         <tbody>
@@ -343,18 +348,18 @@ export function exportMonthToPDF(
 
       <div class="signature-section">
         <div class="signature-box">
-          <p>توقيع الموظف</p>
+          <p>${t.employeeSignature}</p>
           <div class="signature-line"></div>
-          <p style="font-size: 9px; color: #64748b;">أوافق على البيانات الواردة أعلاه</p>
+          <p style="font-size: 9px; color: #64748b;">${t.agreeToInfo}</p>
         </div>
         <div class="signature-box">
-          <p>المحاسب المسؤول</p>
+          <p>${t.accountant}</p>
           <div class="signature-line"></div>
         </div>
         <div class="signature-box">
-          <p>توقيع المدير العام</p>
+          <p>${t.managerSignature}</p>
           <div class="signature-line"></div>
-          <p style="font-size: 9px; color: #64748b;">يُعتمد الصرف</p>
+          <p style="font-size: 9px; color: #64748b;">${t.approvedForPayment}</p>
         </div>
       </div>
     </body>
@@ -387,8 +392,11 @@ export function exportRangeToPDF(
   exceptions: ExceptionEvent[],
   holidays: Holiday[],
   monthlySalaries: { [key: string]: number },
-  payments: Payment[]
+  payments: Payment[],
+  lang: ReportLang = 'ar'
 ) {
+  const t = reportTranslations[lang];
+  const isRtl = lang === 'ar';
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
   
@@ -457,18 +465,18 @@ export function exportRangeToPDF(
   const rangeTotalPaid = rangePayments.reduce((sum, p) => sum + p.amount, 0);
   const rangeBalance = rangeNetSalary - rangeTotalPaid;
 
-  let remainingTitle = 'الرصيد المتبقي (مستوفى)';
+  let remainingTitle = t.remainingBalanceSettled;
   let remainingBg = '#f8fafc';
   let remainingBorder = '#e2e8f0';
   let remainingTextColor = '#0f172a';
   
   if (rangeBalance > 0) {
-    remainingTitle = 'الرصيد المتبقي (لك)';
+    remainingTitle = t.remainingBalanceToYou;
     remainingBg = '#f0fdf4';
     remainingBorder = '#6ee7b7';
     remainingTextColor = '#15803d';
   } else if (rangeBalance < 0) {
-    remainingTitle = 'الرصيد المتبقي (عليك)';
+    remainingTitle = t.remainingBalanceFromYou;
     remainingBg = '#fef2f2';
     remainingBorder = '#fca5a5';
     remainingTextColor = '#b91c1c';
@@ -480,7 +488,7 @@ export function exportRangeToPDF(
     paymentsRowsHtml = `
       <tr>
         <td colspan="3" style="padding: 10px; border: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 11px;">
-          لا توجد أي سُلف أو دفعات مسجلة في هذه الفترة.
+          ${t.noPayments}
         </td>
       </tr>
     `;
@@ -490,7 +498,7 @@ export function exportRangeToPDF(
       paymentsRowsHtml += `
         <tr style="text-align: center; font-size: 11px;">
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 600;">${d}/${m}/${y}</td>
-          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: right;">${p.note || '-'}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: ${isRtl ? 'right' : 'left'};">${p.note || '-'}</td>
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold; color: #059669;">${formatCurrency(p.amount)}</td>
         </tr>
       `;
@@ -514,16 +522,16 @@ export function exportRangeToPDF(
   iframeDoc.open();
   iframeDoc.write(`
     <!DOCTYPE html>
-    <html dir="rtl" lang="ar">
+    <html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${lang}">
     <head>
       <meta charset="utf-8">
-      <title>تقرير الرواتب المخصص - من ${startDateStr} إلى ${endDateStr}</title>
+      <title>${t.reportTitleRange} - ${startDateStr} - ${endDateStr}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
       <style>
         body {
-          font-family: 'Cairo', sans-serif;
+          font-family: ${isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif"};
           margin: 0;
           padding: 20px;
           color: #0f172a;
@@ -588,8 +596,8 @@ export function exportRangeToPDF(
           font-size: 13px;
           font-weight: 700;
           color: #1e293b;
-          border-right: 3px solid #6366f1;
-          padding-right: 8px;
+          border-${isRtl ? 'right' : 'left'}: 3px solid #6366f1;
+          padding-${isRtl ? 'right' : 'left'}: 8px;
           margin: 20px 0 10px 0;
         }
         .table-container {
@@ -625,90 +633,114 @@ export function exportRangeToPDF(
     <body>
       <div class="header">
         <div>
-          <h1 class="title">تقرير حساب الرواتب والأجور الموحد</h1>
-          <p class="meta-text" style="font-weight: bold;">النطاق المختار: من ${startDateStr} إلى ${endDateStr}</p>
-          <p class="meta-text">قواعد الحساب: قانون العمل التركي (45 ساعة أسبوعية / 225 ساعة شهرية)</p>
+          <h1 class="title">${t.reportTitleRange}</h1>
+          <p class="meta-text" style="font-weight: bold;">${t.selectedRange}: ${startDateStr} - ${endDateStr}</p>
+          <p class="meta-text">${t.calculationRules}</p>
         </div>
-        <div style="text-align: left;">
-          <p class="meta-text" style="font-weight: bold; font-size: 13px; color: #1e3a8a;">برنامج إدارة الأجور crm</p>
-          <p class="meta-text">تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-EG')}</p>
+        <div style="text-align: ${isRtl ? 'left' : 'right'};">
+          <p class="meta-text" style="font-weight: bold; font-size: 13px; color: #1e3a8a;">${t.crmSystem}</p>
+          <p class="meta-text">${t.exportDate}: ${new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'tr-TR')}</p>
         </div>
       </div>
 
       <div class="summary-grid">
         <div class="card">
-          <p class="card-title">إجمالي الرواتب الأساسية</p>
+          <p class="card-title">${t.totalBaseSalaries}</p>
           <p class="card-value">${formatCurrency(rangeBaseSalary)}</p>
-          <p class="card-desc">الرواتب الأساسية للفترة</p>
+          <p class="card-desc">${t.totalBaseSalaries}</p>
         </div>
         <div class="card" style="border-color: #6ee7b7;">
-          <p class="card-title" style="color: #10b981;">إجمالي الإضافي</p>
+          <p class="card-title" style="color: #10b981;">${t.totalOvertimePay}</p>
           <p class="card-value" style="color: #059669;">+${formatCurrency(rangeOvertimePay)}</p>
-          <p class="card-desc">أجور العمل الإضافي للفترة</p>
+          <p class="card-desc">${t.overtimePay}</p>
         </div>
         <div class="card" style="border-color: #fca5a5;">
-          <p class="card-title" style="color: #ef4444;">إجمالي الخصومات</p>
+          <p class="card-title" style="color: #ef4444;">${t.totalDeductions}</p>
           <p class="card-value" style="color: #dc2626;">-${formatCurrency(rangeDeductions)}</p>
-          <p class="card-desc">الغياب والتأخير للفترة</p>
+          <p class="card-desc">${t.absences}/${t.delays}</p>
         </div>
         <div class="card" style="background-color: #eff6ff; border-color: #93c5fd;">
-          <p class="card-title" style="color: #2563eb;">صافي المستحقات</p>
+          <p class="card-title" style="color: #2563eb;">${t.netDue}</p>
           <p class="card-value" style="color: #1d4ed8;">${formatCurrency(rangeNetSalary)}</p>
-          <p class="card-desc">صافي الراتب المستحق للفترة</p>
+          <p class="card-desc">${t.totalNetDueEarned}</p>
         </div>
         <div class="card" style="border-color: #cbd5e1;">
-          <p class="card-title" style="color: #475569;">إجمالي المقبوض</p>
+          <p class="card-title" style="color: #475569;">${t.totalReceived}</p>
           <p class="card-value" style="color: #334155;">${formatCurrency(rangeTotalPaid)}</p>
-          <p class="card-desc">مجموع السُلف والدفعات</p>
+          <p class="card-desc">${t.advancesAndPayments}</p>
         </div>
         <div class="card" style="background-color: ${remainingBg}; border-color: ${remainingBorder};">
           <p class="card-title" style="color: ${remainingTextColor};">${remainingTitle}</p>
           <p class="card-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(rangeBalance))}</p>
-          <p class="card-desc" style="color: ${remainingTextColor};">الرصيد المتبقي الإجمالي</p>
+          <p class="card-desc" style="color: ${remainingTextColor};">${t.totalRemainingBalance}</p>
         </div>
       </div>
 
-      <h2 class="section-title">ملخص كشف الرواتب الشهري</h2>
-      <table class="table-container" style="margin-bottom: 25px;">
-        <thead>
-          <tr>
-            <th style="width: 20%">الشهر</th>
-            <th style="width: 20%">الراتب الأساسي</th>
-            <th style="width: 20%">مستحقات الإضافي</th>
-            <th style="width: 20%">الخصومات</th>
-            <th style="width: 20%">صافي الراتب المستحق</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${monthlyRowsHtml}
-        </tbody>
-      </table>
+      <div style="display: grid; grid-template-cols: 2fr 1fr; gap: 20px; margin-bottom: 25px; align-items: start;">
+        <div>
+          <h2 class="section-title">${t.reportTitleRange}</h2>
+          <table class="table-container" style="margin-bottom: 15px;">
+            <thead>
+              <tr>
+                <th style="width: 20%">${t.month}</th>
+                <th style="width: 20%">${t.baseSalary}</th>
+                <th style="width: 20%">${t.overtimePay}</th>
+                <th style="width: 20%">${t.totalDeductions}</th>
+                <th style="width: 20%">${t.netSalaryDue}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${monthlyRowsHtml}
+            </tbody>
+          </table>
 
-      <h2 class="section-title">تفاصيل الدفعات المالية والسُلف المستلمة</h2>
-      <table class="table-container" style="margin-bottom: 25px; max-width: 650px;">
-        <thead>
-          <tr style="background-color: #475569;">
-            <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">التاريخ</th>
-            <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 50%">البيان / الملاحظة</th>
-            <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">المبلغ</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${paymentsRowsHtml}
-        </tbody>
-      </table>
+          <h2 class="section-title">${t.financialReconciliation}</h2>
+          <table class="table-container" style="max-width: 400px; font-weight: bold;">
+            <tbody>
+              <tr>
+                <td style="padding: 6px; border: 1px solid #e2e8f0; background-color: #f8fafc;">${t.totalNetDueEarned}</td>
+                <td style="padding: 6px; border: 1px solid #e2e8f0; color: #1d4ed8;">${formatCurrency(rangeNetSalary)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px; border: 1px solid #e2e8f0; background-color: #f8fafc;">${t.totalPaymentsPaid}</td>
+                <td style="padding: 6px; border: 1px solid #e2e8f0; color: #dc2626;">${formatCurrency(rangeTotalPaid)}</td>
+              </tr>
+              <tr style="background-color: ${rangeBalance >= 0 ? '#f0fdf4' : '#fef2f2'};">
+                <td style="padding: 6px; border: 1px solid #e2e8f0;">${rangeBalance >= 0 ? t.netRemainingToYou : t.netRemainingFromYou}</td>
+                <td style="padding: 6px; border: 1px solid #e2e8f0; color: ${rangeBalance >= 0 ? '#15803d' : '#b91c1c'};">${formatCurrency(Math.abs(rangeBalance))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div>
+          <h2 class="section-title">${t.advancesReceived}</h2>
+          <table class="table-container">
+            <thead>
+              <tr style="background-color: #475569;">
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 30%">${t.date}</th>
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 45%">${t.description}</th>
+                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">${t.amount}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paymentsRowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <div class="signature-section">
         <div class="signature-box">
-          <p>توقيع الموظف</p>
+          <p>${t.employeeSignature}</p>
           <div class="signature-line"></div>
         </div>
         <div class="signature-box">
-          <p>المحاسب المسؤول</p>
+          <p>${t.accountant}</p>
           <div class="signature-line"></div>
         </div>
         <div class="signature-box">
-          <p>توقيع المدير العام</p>
+          <p>${t.managerSignature}</p>
           <div class="signature-line"></div>
         </div>
       </div>

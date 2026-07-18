@@ -1,5 +1,6 @@
 import { DayBreakdown, MonthlyCalculationResult, UserSettings, ExceptionEvent, Payment, Holiday } from '../types/salary';
 import { calculateMonthlySalary } from './salaryCalculator';
+import { ReportLang, reportTranslations } from './translations';
 
 /**
  * Exports the monthly salary and overtime report as a CSV file.
@@ -11,84 +12,66 @@ export function exportMonthToCSV(
   monthName: string,
   settings: UserSettings,
   calculationResult: MonthlyCalculationResult,
-  dayBreakdowns: DayBreakdown[]
+  dayBreakdowns: DayBreakdown[],
+  lang: ReportLang = 'ar'
 ) {
-  const daysOfWeek = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const t = reportTranslations[lang];
+  let csvContent = '\uFEFF'; // UTF-8 BOM
   
-  // UTF-8 BOM
-  let csvContent = '\uFEFF';
+  // Summary Section
+  csvContent += `"${t.reportTitleMonthly} - ${monthName} ${year}"\n`;
+  csvContent += `"${t.baseSalary}",${calculationResult.baseSalary.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalDeductions}",-${(calculationResult.totalAbsenceDeduction + calculationResult.totalDelayDeduction).toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalOvertimePay}",${calculationResult.totalOvertimePay.toFixed(2)} TRY\n`;
+  csvContent += `"${t.netSalaryDue}",${calculationResult.netSalary.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalReceived}",${calculationResult.totalPaymentsReceived.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalRemainingBalance}",${calculationResult.remainingBalance.toFixed(2)} TRY\n\n`;
 
-  // Summary Sections
-  csvContent += `تقرير حساب الرواتب والعمل الإضافي - لشهر,"${monthName} ${year}"\n`;
-  csvContent += `الراتب الأساسي الصافي,${calculationResult.baseSalary.toFixed(2)} TRY\n`;
-  csvContent += `أجرة اليوم الواحد,${calculationResult.dailyWage.toFixed(2)} TRY\n`;
-  csvContent += `أجرة الساعة العادية,${calculationResult.regularHourlyWage.toFixed(2)} TRY\n`;
-  csvContent += `إجمالي أيام الغياب,${calculationResult.totalAbsenceDays} يوم\n`;
-  csvContent += `خصم الغياب,-${calculationResult.totalAbsenceDeduction.toFixed(2)} TRY\n`;
-  csvContent += `إجمالي ساعات التأخير,${calculationResult.totalDelayHours} ساعة\n`;
-  csvContent += `خصم التأخير,-${calculationResult.totalDelayDeduction.toFixed(2)} TRY\n`;
-  
-  csvContent += `ساعات إضافي تغطية النقص (1x),${calculationResult.overtime1xHours.toFixed(1)} ساعة\n`;
-  csvContent += `أجر إضافي تغطية النقص (1x),${calculationResult.overtime1xPay.toFixed(2)} TRY\n`;
-  
-  csvContent += `ساعات إضافي عادي/مسائي (1.5x),${calculationResult.overtime1_5xHours.toFixed(1)} ساعة\n`;
-  csvContent += `أجر إضافي عادي/مسائي (1.5x),${calculationResult.overtime1_5xPay.toFixed(2)} TRY\n`;
-  
-  csvContent += `ساعات إضافي أحد/عطل (2.0x),${calculationResult.overtime2xHours.toFixed(1)} ساعة\n`;
-  csvContent += `أجر إضافي أحد/عطل (2.0x),${calculationResult.overtime2xPay.toFixed(2)} TRY\n`;
-  
-  csvContent += `إجمالي مستحقات العمل الإضافي,${calculationResult.totalOvertimePay.toFixed(2)} TRY\n`;
-  csvContent += `الراتب الصافي النهائي المتوقع,${calculationResult.netSalary.toFixed(2)} TRY\n`;
-  csvContent += `إجمالي الدفعات المستلمة,${calculationResult.totalPaymentsReceived.toFixed(2)} TRY\n`;
-  csvContent += `الرصيد المتبقي (مستحق للموظف / مستحق للشركة),${calculationResult.remainingBalance.toFixed(2)} TRY\n\n`;
+  // Daily details Headers
+  csvContent += `"${t.dailyAttendanceLog}"\n`;
+  csvContent += `"${t.date}","${t.day}","${t.dayType}","${t.scheduledHours}","${t.actualHours}","${t.exceptionsAndOvertime}"\n`;
 
-  // Daily Grid Table Headers
-  const headers = [
-    'التاريخ',
-    'اليوم',
-    'عطلة رسمية',
-    'اسم العطلة',
-    'ساعات الدوام الافتراضية',
-    'ساعات العمل الفعلية المنفذة',
-    'الغياب',
-    'التأخير (ساعات)',
-    'إضافي بمعدل 1.0x (ساعات)',
-    'إضافي بمعدل 1.5x (ساعات)',
-    'إضافي بمعدل 2.0x (ساعات)'
-  ];
+  const daysOfWeekAr = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  const daysOfWeekEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const daysOfWeekTr = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+  const daysOfWeek = lang === 'ar' ? daysOfWeekAr : (lang === 'tr' ? daysOfWeekTr : daysOfWeekEn);
 
-  csvContent += headers.join(',') + '\n';
-
-  // Day breakdown rows
   dayBreakdowns.forEach((day) => {
-    // Parse date safely
     const [y, m, d] = day.date.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
     const dayName = daysOfWeek[dateObj.getDay()];
 
+    let dayTypeLabel = t.regularDay;
+    if (day.isHoliday) dayTypeLabel = `${t.holidayDay}: ${day.holidayName || ''}`;
+    else if (dateObj.getDay() === 0 || dateObj.getDay() === 6) dayTypeLabel = t.weekendDay;
+
+    let exceptionLabel = '-';
+    if (day.absenceDays > 0) exceptionLabel = t.absenceDay;
+    else if (day.delayHours > 0) exceptionLabel = `${t.delayDay} ${day.delayHours}${t.hours}`;
+    else if (day.flatOvertimeHours > 0) exceptionLabel = `${t.overtimeDay} ${day.flatOvertimeHours}${t.hours} (1.0x)`;
+    else if ((day.weekdayOvertimeHours + day.saturdayOvertimeHours) > 0) {
+      exceptionLabel = `${t.overtimeDay} ${(day.weekdayOvertimeHours + day.saturdayOvertimeHours)}${t.hours} (1.5x)`;
+    } else if (day.sundayHolidayOvertimeHours > 0) {
+      exceptionLabel = `${t.overtimeDay} ${day.sundayHolidayOvertimeHours}${t.hours} (2.0x)`;
+    }
+
     const row = [
-      day.date,
+      `${d}/${m}/${y}`,
       dayName,
-      day.isHoliday ? 'نعم' : 'لا',
-      day.holidayName || '',
-      day.defaultScheduledHours,
-      day.actualWeekdayHoursWorked,
-      day.absenceDays > 0 ? 'نعم' : 'لا',
-      day.delayHours,
-      day.flatOvertimeHours || 0,
-      (day.weekdayOvertimeHours || 0) + (day.saturdayOvertimeHours || 0),
-      day.sundayHolidayOvertimeHours || 0
+      dayTypeLabel,
+      `${day.defaultScheduledHours}${t.hours}`,
+      `${day.actualWeekdayHoursWorked}${t.hours}`,
+      exceptionLabel
     ];
 
     csvContent += row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',') + '\n';
   });
 
-  // Download Trigger
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', `تقرير_رواتب_${year}_${month + 1}.csv`);
+  link.setAttribute('download', `salary_report_${year}_${month + 1}_${lang}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -105,8 +88,10 @@ export function exportRangeToCSV(
   exceptions: ExceptionEvent[],
   holidays: Holiday[],
   monthlySalaries: { [key: string]: number },
-  payments: Payment[]
+  payments: Payment[],
+  lang: ReportLang = 'ar'
 ) {
+  const t = reportTranslations[lang];
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
   
@@ -139,7 +124,6 @@ export function exportRangeToCSV(
       return ey === year && (em - 1) === month;
     });
     
-    // Pass same holidays list (approximation)
     const monthRes = calculateMonthlySalary(year, month, settings, monthExceptions, holidays, customSalary);
     const monthDeductions = monthRes.totalAbsenceDeduction + monthRes.totalDelayDeduction;
     
@@ -161,26 +145,26 @@ export function exportRangeToCSV(
   const rangeBalance = rangeNetSalary - rangeTotalPaid;
 
   let csvContent = '\uFEFF'; // UTF-8 BOM
-  csvContent += `تقرير مخصص لحساب الرواتب والعمل الإضافي,الفترة: من ${startDateStr} إلى ${endDateStr}\n\n`;
-  csvContent += `ملخص الفترة المالية\n`;
-  csvContent += `إجمالي الراتب الأساسي,${rangeBaseSalary.toFixed(2)} TRY\n`;
-  csvContent += `إجمالي مستحقات العمل الإضافي,${rangeOvertimePay.toFixed(2)} TRY\n`;
-  csvContent += `إجمالي الخصومات,-${rangeDeductions.toFixed(2)} TRY\n`;
-  csvContent += `إجمالي صافي الراتب المستحق,${rangeNetSalary.toFixed(2)} TRY\n`;
-  csvContent += `إجمالي الدفعات المستلمة,${rangeTotalPaid.toFixed(2)} TRY\n`;
-  csvContent += `الرصيد المتبقي (${rangeBalance >= 0 ? 'مستحق لك' : 'مستحق عليك'}),${rangeBalance.toFixed(2)} TRY\n\n`;
+  csvContent += `"${t.reportTitleRange}",${t.selectedRange}: ${startDateStr} - ${endDateStr}\n\n`;
+  csvContent += `"${t.financialReconciliation}"\n`;
+  csvContent += `"${t.totalBaseSalaries}",${rangeBaseSalary.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalOvertimePay}",${rangeOvertimePay.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalDeductions}",-${rangeDeductions.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalNetDueEarned}",${rangeNetSalary.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalPaymentsPaid}",${rangeTotalPaid.toFixed(2)} TRY\n`;
+  csvContent += `"${t.totalRemainingBalance} (${rangeBalance >= 0 ? t.netRemainingToYou : t.netRemainingFromYou})",${rangeBalance.toFixed(2)} TRY\n\n`;
 
-  csvContent += `تفاصيل الأشهر في الفترة المحددة\n`;
-  csvContent += `الشهر,الراتب الأساسي الصافي,مستحقات العمل الإضافي,الخصومات,صافي المستحقات\n`;
+  csvContent += `"${t.reportTitleRange}"\n`;
+  csvContent += `"${t.month}","${t.baseSalary}","${t.overtimePay}","${t.totalDeductions}","${t.netSalaryDue}"\n`;
   monthRows.forEach(row => {
     csvContent += row + '\n';
   });
   csvContent += '\n';
 
-  csvContent += `سجل الدفعات المقبوضة في هذه الفترة\n`;
-  csvContent += `التاريخ,البيان / الملاحظة,المبلغ المستلم\n`;
+  csvContent += `"${t.advancesReceived}"\n`;
+  csvContent += `"${t.date}","${t.description}","${t.amount}"\n`;
   if (rangePayments.length === 0) {
-    csvContent += `-,لا توجد دفعات مسجلة,-\n`;
+    csvContent += `-,${t.noPayments},-\n`;
   } else {
     rangePayments.forEach(p => {
       csvContent += `${p.date},"${p.note || ''}",${p.amount.toFixed(2)}\n`;
@@ -192,7 +176,7 @@ export function exportRangeToCSV(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', `تقرير_رواتب_مخصص_${startDateStr}_إلى_${endDateStr}.csv`);
+  link.setAttribute('download', `salary_report_range_${startDateStr}_to_${endDateStr}_${lang}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();

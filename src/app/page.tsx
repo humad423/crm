@@ -13,6 +13,7 @@ import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, Ha
 import { generateMonthlyBreakdown } from '../utils/salaryCalculator';
 import { exportMonthToCSV } from '../utils/csvExporter';
 import { exportMonthToPDF } from '../utils/pdfExporter';
+import { ReportLang } from '../utils/translations';
 
 export default function Home() {
   const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized, user, logout } = useSalary();
@@ -20,14 +21,16 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
+  const [exportLang, setExportLang] = useState<ReportLang>('ar');
+
   const handleExportCSV = () => {
     const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays);
-    exportMonthToCSV(year, month, months[month], settings, calculationResult, dayBreakdowns);
+    exportMonthToCSV(year, month, months[month], settings, calculationResult, dayBreakdowns, exportLang);
   };
 
   const handleExportPDF = () => {
     const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays);
-    exportMonthToPDF(year, month, months[month], settings, calculationResult, dayBreakdowns, exceptions);
+    exportMonthToPDF(year, month, months[month], settings, calculationResult, dayBreakdowns, exceptions, exportLang);
   };
 
   // Load and apply theme (Defaulting to light mode)
@@ -190,6 +193,17 @@ export default function Home() {
               <Plus className="w-4 h-4" />
               سجل حالة استثنائية اليوم
             </button>
+
+            {/* Language Selector */}
+            <select
+              value={exportLang}
+              onChange={(e) => setExportLang(e.target.value as ReportLang)}
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+            >
+              <option value="ar" className="text-slate-900 dark:bg-slate-900">العربية (AR)</option>
+              <option value="en" className="text-slate-900 dark:bg-slate-900">English (EN)</option>
+              <option value="tr" className="text-slate-900 dark:bg-slate-900">Türkçe (TR)</option>
+            </select>
 
             {/* Export CSV Action */}
             <button
