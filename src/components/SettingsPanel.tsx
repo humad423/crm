@@ -182,9 +182,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
                         {formatCurrency(calculationResult.regularHourlyWage)}
                       </p>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-                        (الراتب ÷ {(activeSchedule.weeklyHours * (52 / 12)).toFixed(0)} ساعة/شهر)
-                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">(الراتب ÷ 225 ساعة)</span>
                     </div>
                   </div>
                   {/* Active schedule info */}

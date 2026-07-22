@@ -372,13 +372,10 @@ export function calculateMonthlySalary(
 
   // 1. Calculate base rates:
   // - Accounting month is always 30 days. Daily wage = Salary / 30.
-  // - Total standard monthly hours = dailyHours * 5 days/week * (52 weeks / 12 months) ≈ daily*21.67
-  //   Turkish law uses Salary/225 (45h * 5 weeks) as the hourly rate baseline.
-  //   We scale: regularHourlyWage = baseSalary / (weeklyHours * (52/12))
-  //   But to maintain backward compat with 45h standard, we keep 225 as base and scale.
-  const standardMonthlyHours = weeklyHours * (52 / 12); // e.g. 47.5 * 4.333 ≈ 205.8
+  // - Turkish Labor Law standard monthly hours baseline = 225 hours.
+  //   Regular hourly wage = Salary / 225.
   const dailyWage = baseSalary / 30;
-  const regularHourlyWage = baseSalary / standardMonthlyHours;
+  const regularHourlyWage = baseSalary / 225;
 
   // 2. Generate daily breakdown & perform weekly calculations using resolved dailyHours
   const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays, dailyHours);
