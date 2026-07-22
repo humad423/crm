@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserSettings, ExceptionEvent, Holiday, MonthlyCalculationResult, Payment } from '../types/salary';
+import { UserSettings, ExceptionEvent, Holiday, MonthlyCalculationResult, Payment, WorkSchedulePeriod } from '../types/salary';
 import { calculateMonthlySalary } from '../utils/salaryCalculator';
 import { supabase } from '../utils/supabaseClient';
 import { User } from '@supabase/supabase-js';
@@ -34,6 +34,11 @@ interface SalaryContextType {
   addPayment: (payment: { date: string; amount: number; note?: string }) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
   updatePayment: (id: string, updates: { date: string; amount: number; note?: string }) => Promise<void>;
+  // Schedule periods
+  schedulePeriods: WorkSchedulePeriod[];
+  addSchedulePeriod: (period: Omit<WorkSchedulePeriod, 'id'>) => Promise<void>;
+  updateSchedulePeriod: (id: string, period: Omit<WorkSchedulePeriod, 'id'>) => Promise<void>;
+  deleteSchedulePeriod: (id: string) => Promise<void>;
   // Cumulative balance across ALL months
   cumulativeBalance: number;
   cumulativeTotalEarned: number;
@@ -65,6 +70,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   // Custom monthly salary and payments state
   const [monthlySalaries, setMonthlySalaries] = useState<{ [key: string]: number }>({});
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [schedulePeriods, setSchedulePeriods] = useState<WorkSchedulePeriod[]>([]);
 
   // 1. Listen to Auth Changes and load session on mount
   useEffect(() => {
@@ -184,6 +190,26 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
       } else {
         setPayments([]);
       }
+      // E. Fetch Schedule Periods
+      const { data: scheduleData } = await supabase
+        .from('schedule_periods')
+        .select('*')
+        .eq('user_id', userId)
+        .order('effective_from', { ascending: true });
+
+      if (scheduleData) {
+        const mapped: WorkSchedulePeriod[] = scheduleData.map((s) => ({
+          id: s.id,
+          effectiveFrom: s.effective_from,
+          label: s.label || undefined,
+          startTime: s.start_time,
+          endTime: s.end_time,
+          breakMinutes: Number(s.break_minutes),
+        }));
+        setSchedulePeriods(mapped);
+      } else {
+        setSchedulePeriods([]);
+      }
     } catch (err) {
       console.error('Error fetching user data:', err);
     }
@@ -221,6 +247,13 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           try { setPayments(JSON.parse(savedPayments)); } catch (e) {}
         } else {
           setPayments([]);
+        }
+
+        const savedSchedulePeriods = localStorage.getItem('salary_schedule_periods');
+        if (savedSchedulePeriods) {
+          try { setSchedulePeriods(JSON.parse(savedSchedulePeriods)); } catch (e) {}
+        } else {
+          setSchedulePeriods([]);
         }
       }
     }
@@ -610,9 +643,80 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ── Schedule Period CRUD ─────────────────────────────────────────────────────
+  const addSchedulePeriod = async (period: Omit<WorkSchedulePeriod, 'id'>) => {
+    if (user) {
+      const { data } = await supabase
+        .from('schedule_periods')
+        .insert({
+          user_id: user.id,
+          effective_from: period.effectiveFrom,
+          label: period.label || '',
+          start_time: period.startTime,
+          end_time: period.endTime,
+          break_minutes: period.breakMinutes,
+        })
+        .select()
+        .single();
+      if (data) {
+        const newPeriod: WorkSchedulePeriod = {
+          id: data.id,
+          effectiveFrom: data.effective_from,
+          label: data.label || undefined,
+          startTime: data.start_time,
+          endTime: data.end_time,
+          breakMinutes: Number(data.break_minutes),
+        };
+        setSchedulePeriods((prev) =>
+          [...prev, newPeriod].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))
+        );
+      }
+    } else {
+      const newPeriod: WorkSchedulePeriod = { id: Math.random().toString(36).substring(2, 9), ...period };
+      const updated = [...schedulePeriods, newPeriod].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+      setSchedulePeriods(updated);
+      localStorage.setItem('salary_schedule_periods', JSON.stringify(updated));
+    }
+  };
+
+  const updateSchedulePeriod = async (id: string, period: Omit<WorkSchedulePeriod, 'id'>) => {
+    if (user) {
+      await supabase.from('schedule_periods').update({
+        effective_from: period.effectiveFrom,
+        label: period.label || '',
+        start_time: period.startTime,
+        end_time: period.endTime,
+        break_minutes: period.breakMinutes,
+      }).eq('user_id', user.id).eq('id', id);
+      setSchedulePeriods((prev) =>
+        prev.map((p) => (p.id === id ? { id, ...period } : p))
+            .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))
+      );
+    } else {
+      const updated = schedulePeriods
+        .map((p) => (p.id === id ? { id, ...period } : p))
+        .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+      setSchedulePeriods(updated);
+      localStorage.setItem('salary_schedule_periods', JSON.stringify(updated));
+    }
+  };
+
+  const deleteSchedulePeriod = async (id: string) => {
+    if (user) {
+      await supabase.from('schedule_periods').delete().eq('user_id', user.id).eq('id', id);
+      setSchedulePeriods((prev) => prev.filter((p) => p.id !== id));
+    } else {
+      const updated = schedulePeriods.filter((p) => p.id !== id);
+      setSchedulePeriods(updated);
+      localStorage.setItem('salary_schedule_periods', JSON.stringify(updated));
+    }
+  };
+
   // Calculate salary breakdowns for selected month
+  // Inject schedulePeriods into settings so the calculator can resolve the active schedule
+  const settingsWithSchedule: UserSettings = { ...settings, schedulePeriods };
   const customSalary = monthlySalaries[`${year}-${month}`];
-  const rawResult = calculateMonthlySalary(year, month, settings, exceptions, holidays, customSalary);
+  const rawResult = calculateMonthlySalary(year, month, settingsWithSchedule, exceptions, holidays, customSalary);
 
   const currentMonthPayments = payments.filter((p) => {
     const [pYear, pMonth] = p.date.split('-').map(Number);
@@ -645,9 +749,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
       return ey === realYear && (em - 1) === m;
     });
     const customMonthlySalary = monthlySalaries[`${realYear}-${m}`];
-    
-    // Calculate full month breakdown including overtime & deductions
-    const monthResult = calculateMonthlySalary(realYear, m, settings, monthExceptions, holidays, customMonthlySalary);
+    const monthResult = calculateMonthlySalary(realYear, m, settingsWithSchedule, monthExceptions, holidays, customMonthlySalary);
     cumulativeTotalEarned += monthResult.netSalary;
   }
 
@@ -685,6 +787,10 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         addPayment,
         deletePayment,
         updatePayment,
+        schedulePeriods,
+        addSchedulePeriod,
+        updateSchedulePeriod,
+        deleteSchedulePeriod,
         cumulativeBalance,
         cumulativeTotalEarned,
         cumulativeTotalPaid,

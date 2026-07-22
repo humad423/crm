@@ -18,13 +18,23 @@ export interface Holiday {
   localName: string; // Turkish name (e.g. Cumhuriyet Bayramı)
 }
 
+export interface WorkSchedulePeriod {
+  id: string;
+  effectiveFrom: string;   // YYYY-MM-DD
+  label?: string;          // e.g. "New schedule July 2026"
+  startTime: string;       // HH:MM  e.g. "07:30"
+  endTime: string;         // HH:MM  e.g. "18:00"
+  breakMinutes: number;    // e.g. 60
+}
+
 export interface UserSettings {
   baseSalary: number; // e.g., 70,000 TRY
-  standardWeeklyHours: number; // e.g., 45
-  defaultDailyHours: number; // e.g., 9
+  standardWeeklyHours: number; // e.g., 45 (legacy/fallback)
+  defaultDailyHours: number; // e.g., 9 (legacy/fallback)
   multiplierWeekdaySat: number; // e.g., 1.5
   multiplierSundayHoliday: number; // e.g., 2.0
   googleApiKey: string; // Optional Google Calendar API key
+  schedulePeriods?: WorkSchedulePeriod[]; // Ordered list of schedule configurations
 }
 
 export interface DayBreakdown {

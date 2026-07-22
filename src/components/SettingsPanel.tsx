@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSalary } from '../context/SalaryContext';
-import { Settings, Info, RefreshCw, X, ShieldAlert, Check, Calendar, FileText, Download } from 'lucide-react';
+import { Settings, Info, RefreshCw, X, ShieldAlert, Check, Calendar, FileText, Download, Clock, Plus, Pencil, Trash2 } from 'lucide-react';
 import { exportRangeToCSV } from '../utils/csvExporter';
 import { exportRangeToPDF } from '../utils/pdfExporter';
 import { ReportLang } from '../utils/translations';
+import { WorkSchedulePeriod } from '../types/salary';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -23,7 +24,11 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     clearMonthlySalary,
     exceptions,
     holidays,
-    payments
+    payments,
+    schedulePeriods,
+    addSchedulePeriod,
+    updateSchedulePeriod,
+    deleteSchedulePeriod,
   } = useSalary();
   
   const [baseSalary, setBaseSalary] = useState(settings.baseSalary);
@@ -31,6 +36,24 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [multiplierSundayHoliday, setMultiplierSundayHoliday] = useState(settings.multiplierSundayHoliday);
   const [googleApiKey, setGoogleApiKey] = useState(settings.googleApiKey);
   const [showSavedToast, setShowSavedToast] = useState(false);
+
+  // Schedule periods local form state
+  const [showAddSchedule, setShowAddSchedule] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [schedForm, setSchedForm] = useState({
+    effectiveFrom: '',
+    label: '',
+    startTime: '07:30',
+    endTime: '17:00',
+    breakMinutes: 30,
+  });
+
+  const computeDailyHours = (start: string, end: string, breakMin: number) => {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    const total = (eh * 60 + em) - (sh * 60 + sm);
+    return Math.max(0, (total - breakMin) / 60);
+  };
 
   // Range and annual report date states
   const [reportStart, setReportStart] = useState(`${year}-01-01`);
@@ -300,6 +323,183 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                   <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
                     يُستخدم لجلب "العطل الرسمية في تركيا" تلقائياً. في حال عدم إدخاله، سيقوم التطبيق بالاعتماد على قاعدة بيانات داخلية لعام 2026.
                   </p>
+                </div>
+
+                {/* Schedule Periods Section */}
+                <div className="border-t border-slate-150 dark:border-slate-800 pt-6 space-y-4">
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-indigo-500" />
+                    جداول الدوام
+                  </h4>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                    حدد فترات الدوام المختلفة مع تاريخ البداية لكل فترة. الحساب التلقائي للساعات ونسبة الإضافي تعتمد على الجدول الساري في كل شهر.
+                  </p>
+
+                  {/* List */}
+                  <div className="space-y-2">
+                    {schedulePeriods.length === 0 && (
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 italic text-center py-2">
+                        لا توجد جداول مخصصة — يُستخدم الإعداد الافتراضي (9 ساعات/يوم، 45 ساعة/أسبوع).
+                      </p>
+                    )}
+                    {schedulePeriods.map((p) => {
+                      const daily = computeDailyHours(p.startTime, p.endTime, p.breakMinutes);
+                      const isEditing = editingScheduleId === p.id;
+                      return (
+                        <div key={p.id} className={`rounded-xl border p-3 text-xs transition-colors ${
+                          isEditing
+                            ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/40 dark:bg-indigo-950/20'
+                            : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/20'
+                        }`}>
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">تاريخ البداية</label>
+                                  <input type="date" value={schedForm.effectiveFrom}
+                                    onChange={(e) => setSchedForm(f => ({ ...f, effectiveFrom: e.target.value }))}
+                                    className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">الوصف</label>
+                                  <input type="text" value={schedForm.label} placeholder="مثال: النظام الجديد"
+                                    onChange={(e) => setSchedForm(f => ({ ...f, label: e.target.value }))}
+                                    className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">من</label>
+                                  <input type="time" value={schedForm.startTime}
+                                    onChange={(e) => setSchedForm(f => ({ ...f, startTime: e.target.value }))}
+                                    className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">إلى</label>
+                                  <input type="time" value={schedForm.endTime}
+                                    onChange={(e) => setSchedForm(f => ({ ...f, endTime: e.target.value }))}
+                                    className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase">استراحة (د)</label>
+                                  <input type="number" min="0" value={schedForm.breakMinutes}
+                                    onChange={(e) => setSchedForm(f => ({ ...f, breakMinutes: Number(e.target.value) }))}
+                                    className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                                ⟹ {computeDailyHours(schedForm.startTime, schedForm.endTime, schedForm.breakMinutes).toFixed(1)} ساعة/يوم · {(computeDailyHours(schedForm.startTime, schedForm.endTime, schedForm.breakMinutes) * 5).toFixed(1)} ساعة/أسبوع
+                              </p>
+                              <div className="flex gap-2">
+                                <button type="button" onClick={async () => {
+                                  await updateSchedulePeriod(p.id, schedForm);
+                                  setEditingScheduleId(null);
+                                }} className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 rounded-lg text-[11px] font-bold">
+                                  <Check className="w-3 h-3" /> حفظ
+                                </button>
+                                <button type="button" onClick={() => setEditingScheduleId(null)}
+                                  className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg text-[11px] font-bold">
+                                  <X className="w-3 h-3" /> إلغاء
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="font-bold text-slate-700 dark:text-slate-300">
+                                  {p.label || 'جدول دوام'}
+                                  <span className="mr-2 text-slate-400 font-normal text-[10px]">من {p.effectiveFrom}</span>
+                                </p>
+                                <p className="text-slate-500 dark:text-slate-400 mt-0.5">
+                                  {p.startTime} → {p.endTime} · استراحة {p.breakMinutes}د · <span className="text-indigo-600 dark:text-indigo-400 font-bold">{daily.toFixed(1)}س/يوم · {(daily*5).toFixed(1)}س/أسبوع</span>
+                                </p>
+                              </div>
+                              <div className="flex gap-1">
+                                <button type="button" onClick={() => {
+                                  setSchedForm({ effectiveFrom: p.effectiveFrom, label: p.label || '', startTime: p.startTime, endTime: p.endTime, breakMinutes: p.breakMinutes });
+                                  setEditingScheduleId(p.id);
+                                  setShowAddSchedule(false);
+                                }} className="p-1.5 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button type="button" onClick={() => {
+                                  if (window.confirm('حذف هذه الفترة؟')) deleteSchedulePeriod(p.id);
+                                }} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-500 rounded-lg transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Add form */}
+                  {showAddSchedule ? (
+                    <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 space-y-2">
+                      <p className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300">إضافة جدول دوام جديد</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">تاريخ البداية *</label>
+                          <input type="date" value={schedForm.effectiveFrom}
+                            onChange={(e) => setSchedForm(f => ({ ...f, effectiveFrom: e.target.value }))}
+                            className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">الوصف</label>
+                          <input type="text" value={schedForm.label} placeholder="مثال: النظام الجديد"
+                            onChange={(e) => setSchedForm(f => ({ ...f, label: e.target.value }))}
+                            className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">من</label>
+                          <input type="time" value={schedForm.startTime}
+                            onChange={(e) => setSchedForm(f => ({ ...f, startTime: e.target.value }))}
+                            className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">إلى</label>
+                          <input type="time" value={schedForm.endTime}
+                            onChange={(e) => setSchedForm(f => ({ ...f, endTime: e.target.value }))}
+                            className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">استراحة (د)</label>
+                          <input type="number" min="0" value={schedForm.breakMinutes}
+                            onChange={(e) => setSchedForm(f => ({ ...f, breakMinutes: Number(e.target.value) }))}
+                            className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                        ⟹ {computeDailyHours(schedForm.startTime, schedForm.endTime, schedForm.breakMinutes).toFixed(1)} ساعة/يوم · {(computeDailyHours(schedForm.startTime, schedForm.endTime, schedForm.breakMinutes) * 5).toFixed(1)} ساعة/أسبوع
+                      </p>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={async () => {
+                          if (!schedForm.effectiveFrom) return;
+                          await addSchedulePeriod(schedForm);
+                          setShowAddSchedule(false);
+                          setSchedForm({ effectiveFrom: '', label: '', startTime: '07:30', endTime: '17:00', breakMinutes: 30 });
+                        }} className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold">
+                          <Plus className="w-3 h-3" /> إضافة
+                        </button>
+                        <button type="button" onClick={() => setShowAddSchedule(false)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg text-[11px] font-bold">
+                          <X className="w-3 h-3" /> إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => {
+                      setShowAddSchedule(true);
+                      setEditingScheduleId(null);
+                      setSchedForm({ effectiveFrom: '', label: '', startTime: '07:30', endTime: '17:00', breakMinutes: 30 });
+                    }} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-dashed border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-[11px] font-bold transition-colors">
+                      <Plus className="w-3.5 h-3.5" /> إضافة جدول دوام جديد
+                    </button>
+                  )}
                 </div>
 
                 {/* Custom Range Export Section */}

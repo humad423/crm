@@ -5,6 +5,7 @@ import {
   MonthlyCalculationResult,
   WeeklyBreakdown,
   DayBreakdown,
+  WorkSchedulePeriod,
 } from '../types/salary';
 
 /**
@@ -36,6 +37,68 @@ export function formatDateStr(date: Date): string {
 }
 
 /**
+ * Parses HH:MM string into total minutes from midnight
+ */
+function parseTimeMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+/**
+ * Resolves the active WorkSchedulePeriod for a given year+month.
+ * Returns computed dailyHours and weeklyHours.
+ * Falls back to settings.defaultDailyHours / standardWeeklyHours if no periods defined.
+ */
+export function getScheduleForMonth(
+  year: number,
+  month: number, // 0-based
+  settings: UserSettings
+): { dailyHours: number; weeklyHours: number; period?: WorkSchedulePeriod } {
+  const periods = settings.schedulePeriods;
+  if (!periods || periods.length === 0) {
+    return {
+      dailyHours: settings.defaultDailyHours,
+      weeklyHours: settings.standardWeeklyHours,
+    };
+  }
+
+  // First day of the given month as YYYY-MM-DD
+  const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+
+  // Sort periods ascending by effectiveFrom
+  const sorted = [...periods].sort((a, b) =>
+    a.effectiveFrom.localeCompare(b.effectiveFrom)
+  );
+
+  // Find the latest period whose effectiveFrom <= monthStart
+  let active: WorkSchedulePeriod | undefined;
+  for (const p of sorted) {
+    if (p.effectiveFrom <= monthStart) {
+      active = p;
+    }
+  }
+
+  if (!active) {
+    // No period covers this month yet — use the very first one if it exists, else fallback
+    active = sorted[0];
+  }
+
+  if (!active) {
+    return {
+      dailyHours: settings.defaultDailyHours,
+      weeklyHours: settings.standardWeeklyHours,
+    };
+  }
+
+  const totalMinutes = parseTimeMinutes(active.endTime) - parseTimeMinutes(active.startTime);
+  const netMinutes = totalMinutes - active.breakMinutes;
+  const dailyHours = Math.max(0, netMinutes / 60);
+  const weeklyHours = dailyHours * 5;
+
+  return { dailyHours, weeklyHours, period: active };
+}
+
+/**
  * Parse date string YYYY-MM-DD into a local Date object
  */
 export function parseDateStr(dateStr: string): Date {
@@ -51,7 +114,8 @@ export function generateMonthlyBreakdown(
   month: number, // 0-based
   settings: UserSettings,
   exceptions: ExceptionEvent[],
-  holidays: Holiday[]
+  holidays: Holiday[],
+  dailyHoursOverride?: number // Optional override from schedule period
 ): DayBreakdown[] {
   const daysInMonth = getDaysInMonth(year, month);
   const breakdowns: DayBreakdown[] = [];
@@ -66,7 +130,8 @@ export function generateMonthlyBreakdown(
     // Is it a scheduled work day? (Mon-Fri, i.e., 1 to 5)
     // Even if it's a holiday, it remains scheduled, but we adjust actual work if absent
     const isScheduledWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
-    const defaultScheduledHours = isScheduledWeekday ? settings.defaultDailyHours : 0;
+    const effectiveDailyHours = dailyHoursOverride !== undefined ? dailyHoursOverride : settings.defaultDailyHours;
+    const defaultScheduledHours = isScheduledWeekday ? effectiveDailyHours : 0;
 
     // Find exceptions for this day
     const dayExceptions = exceptions.filter((e) => e.date === dateStr);
@@ -153,7 +218,8 @@ export function generateMonthlyBreakdown(
  */
 export function calculateWeeklyEqualization(
   dayBreakdowns: DayBreakdown[],
-  settings: UserSettings
+  settings: UserSettings,
+  weeklyHoursOverride?: number
 ): WeeklyBreakdown[] {
   // Group days by calendar week.
   // We can identify a week by finding the Monday of the week.
@@ -215,8 +281,10 @@ export function calculateWeeklyEqualization(
     });
 
     // Weekly Equalization (Denkleştirme) Logic:
-    // Standard weekly hours target is expectedHours (which is typically 45 for a full week of 5 days * 9 hours).
+    // Standard weekly hours target is expectedHours (based on scheduled days * daily hours).
     // If actualWeekdayHours < expectedHours, there is a deficit.
+    // Note: expectedHours is already computed from defaultScheduledHours per day,
+    // which already reflects the active schedule period's dailyHours.
     const deficitHours = Math.max(0, expectedHours - actualWeekdayHours);
 
     let overtimeHours1x = 0;
@@ -299,15 +367,22 @@ export function calculateMonthlySalary(
   const baseSalary = customSalary !== undefined ? customSalary : settings.baseSalary;
   const { multiplierWeekdaySat, multiplierSundayHoliday } = settings;
 
+  // Resolve the active schedule for this month
+  const { dailyHours, weeklyHours } = getScheduleForMonth(year, month, settings);
+
   // 1. Calculate base rates:
   // - Accounting month is always 30 days. Daily wage = Salary / 30.
-  // - Total standard monthly hours = 225. Regular hourly wage = Salary / 225.
+  // - Total standard monthly hours = dailyHours * 5 days/week * (52 weeks / 12 months) ≈ daily*21.67
+  //   Turkish law uses Salary/225 (45h * 5 weeks) as the hourly rate baseline.
+  //   We scale: regularHourlyWage = baseSalary / (weeklyHours * (52/12))
+  //   But to maintain backward compat with 45h standard, we keep 225 as base and scale.
+  const standardMonthlyHours = weeklyHours * (52 / 12); // e.g. 47.5 * 4.333 ≈ 205.8
   const dailyWage = baseSalary / 30;
-  const regularHourlyWage = baseSalary / 225;
+  const regularHourlyWage = baseSalary / standardMonthlyHours;
 
-  // 2. Generate daily breakdown & perform weekly calculations
-  const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays);
-  const weeklyBreakdowns = calculateWeeklyEqualization(dayBreakdowns, settings);
+  // 2. Generate daily breakdown & perform weekly calculations using resolved dailyHours
+  const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays, dailyHours);
+  const weeklyBreakdowns = calculateWeeklyEqualization(dayBreakdowns, settings, weeklyHours);
 
   // 3. Aggregate results across weeks
   let totalAbsenceDays = 0;
@@ -329,8 +404,8 @@ export function calculateMonthlySalary(
   });
 
   // 4. Calculate payouts and deductions
-  // - Absence deduction: 1 day absence = shift hours * hourly wage deduction
-  const totalAbsenceDeduction = totalAbsenceDays * settings.defaultDailyHours * regularHourlyWage;
+  // - Absence deduction: 1 day absence = dailyHours * regularHourlyWage
+  const totalAbsenceDeduction = totalAbsenceDays * dailyHours * regularHourlyWage;
 
   // - Delay deduction: hourly wage * delay hours
   const totalDelayDeduction = totalDelayHours * regularHourlyWage;
