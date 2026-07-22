@@ -29,6 +29,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     addSchedulePeriod,
     updateSchedulePeriod,
     deleteSchedulePeriod,
+    activeSchedule,
   } = useSalary();
   
   const [baseSalary, setBaseSalary] = useState(settings.baseSalary);
@@ -181,9 +182,23 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
                         {formatCurrency(calculationResult.regularHourlyWage)}
                       </p>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">(الراتب ÷ 225 ساعة)</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+                        (الراتب ÷ {(activeSchedule.weeklyHours * (52 / 12)).toFixed(0)} ساعة/شهر)
+                      </span>
                     </div>
                   </div>
+                  {/* Active schedule info */}
+                  {activeSchedule.period && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1.5">
+                      <span>⏰</span>
+                      <span>الجدول الساري: {activeSchedule.period.label || 'جدول دوام'} · {activeSchedule.period.startTime} → {activeSchedule.period.endTime} · استراحة {activeSchedule.period.breakMinutes}د · <strong>{activeSchedule.dailyHours.toFixed(1)}س/يوم</strong></span>
+                    </div>
+                  )}
+                  {!activeSchedule.period && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500">
+                      ⚠️ لا يوجد جدول دوام — يُستخدم الإعداد الافتراضي ({activeSchedule.dailyHours}س/يوم، {activeSchedule.weeklyHours}س/أسبوع). أضف جدول دوام أدناه لتحديد الساعات بدقة.
+                    </div>
+                  )}
                 </div>
 
                 {/* Base Salary Input */}

@@ -8,7 +8,7 @@ interface SalaryCalendarProps {
 }
 
 export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
-  const { year, month, exceptions, holidays, calculationResult, deleteExceptionByDate } = useSalary();
+  const { year, month, exceptions, holidays, calculationResult, deleteExceptionByDate, activeSchedule } = useSalary();
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDayOfMonth = new Date(year, month, 1);
@@ -66,7 +66,7 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
             </h2>
           </div>
           <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 rounded-full">
-            الدوام الافتراضي: 9س / إثنين-جمعة
+            الدوام: {activeSchedule.dailyHours.toFixed(1)}س/يوم · {activeSchedule.weeklyHours.toFixed(1)}س/أسبوع
           </span>
         </div>
 
@@ -201,8 +201,8 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
                   {/* Default active display if no exception and regular work day */}
                   {!dayExceptions.length && !isWeekend && !isHoliday && (
                     <span className="text-[9px] text-slate-400 dark:text-slate-500 w-full text-center group-hover:text-slate-500">
-                      <span className="hidden sm:inline">9 ساعات (تلقائي)</span>
-                      <span className="sm:hidden text-slate-450/70">9س</span>
+                      <span className="hidden sm:inline">{activeSchedule.dailyHours.toFixed(1)} ساعة (تلقائي)</span>
+                      <span className="sm:hidden text-slate-450/70">{activeSchedule.dailyHours.toFixed(1)}س</span>
                     </span>
                   )}
 
@@ -266,7 +266,7 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
                       </span>
                     ) : (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-md">
-                        مكتمل (45س)
+                        مكتمل ({activeSchedule.weeklyHours.toFixed(0)}س)
                       </span>
                     )}
                   </div>

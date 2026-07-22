@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserSettings, ExceptionEvent, Holiday, MonthlyCalculationResult, Payment, WorkSchedulePeriod } from '../types/salary';
-import { calculateMonthlySalary } from '../utils/salaryCalculator';
+import { calculateMonthlySalary, getScheduleForMonth } from '../utils/salaryCalculator';
 import { supabase } from '../utils/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -39,6 +39,8 @@ interface SalaryContextType {
   addSchedulePeriod: (period: Omit<WorkSchedulePeriod, 'id'>) => Promise<void>;
   updateSchedulePeriod: (id: string, period: Omit<WorkSchedulePeriod, 'id'>) => Promise<void>;
   deleteSchedulePeriod: (id: string) => Promise<void>;
+  // Active schedule for the selected month (dynamic, from schedule periods or defaults)
+  activeSchedule: { dailyHours: number; weeklyHours: number; period?: WorkSchedulePeriod };
   // Cumulative balance across ALL months
   cumulativeBalance: number;
   cumulativeTotalEarned: number;
@@ -715,6 +717,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   // Calculate salary breakdowns for selected month
   // Inject schedulePeriods into settings so the calculator can resolve the active schedule
   const settingsWithSchedule: UserSettings = { ...settings, schedulePeriods };
+  const activeSchedule = getScheduleForMonth(year, month, settingsWithSchedule);
   const customSalary = monthlySalaries[`${year}-${month}`];
   const rawResult = calculateMonthlySalary(year, month, settingsWithSchedule, exceptions, holidays, customSalary);
 
@@ -791,6 +794,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         addSchedulePeriod,
         updateSchedulePeriod,
         deleteSchedulePeriod,
+        activeSchedule,
         cumulativeBalance,
         cumulativeTotalEarned,
         cumulativeTotalPaid,
