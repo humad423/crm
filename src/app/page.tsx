@@ -149,81 +149,85 @@ export default function Home() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-fade-in">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-8 animate-fade-in">
         
         {/* Sub-Header: Month/Year selector and Quick Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm">
-          {/* Selectors */}
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">الشهر المحاسبي</span>
-              <select
-                value={month}
-                onChange={handleMonthChange}
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3 sm:p-4 shadow-sm">
+          <div className="flex flex-col gap-3">
+            {/* Row 1: Selectors + Quick Log */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">الشهر</span>
+                <select
+                  value={month}
+                  onChange={handleMonthChange}
+                  className="px-2 sm:px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  {months.map((mName, idx) => (
+                    <option key={idx} value={idx} className="dark:bg-slate-900">{mName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">السنة</span>
+                <select
+                  value={year}
+                  onChange={handleYearChange}
+                  className="px-2 sm:px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  {years.map((y) => (
+                    <option key={y} value={y} className="dark:bg-slate-900">{y}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex-1" />
+
+              {/* Quick Log — always visible */}
+              <button
+                onClick={handleQuickLog}
+                type="button"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 transition-all whitespace-nowrap"
               >
-                {months.map((mName, idx) => (
-                  <option key={idx} value={idx} className="dark:bg-slate-900">{mName}</option>
-                ))}
-              </select>
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">سجل حالة استثنائية اليوم</span>
+                <span className="sm:hidden">سجل</span>
+              </button>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">السنة</span>
+            {/* Row 2: Language + Export buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
               <select
-                value={year}
-                onChange={handleYearChange}
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                value={exportLang}
+                onChange={(e) => setExportLang(e.target.value as ReportLang)}
+                className="px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                {years.map((y) => (
-                  <option key={y} value={y} className="dark:bg-slate-900">{y}</option>
-                ))}
+                <option value="ar" className="text-slate-900 dark:bg-slate-900">AR</option>
+                <option value="en" className="text-slate-900 dark:bg-slate-900">EN</option>
+                <option value="tr" className="text-slate-900 dark:bg-slate-900">TR</option>
               </select>
+
+              <button
+                onClick={handleExportCSV}
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">تصدير CSV</span>
+                <span className="sm:hidden">CSV</span>
+              </button>
+
+              <button
+                onClick={handleExportPDF}
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">تصدير PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </button>
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2.5 self-start sm:self-auto w-full sm:w-auto">
-            {/* Quick Log Action */}
-            <button
-              onClick={handleQuickLog}
-              type="button"
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 hover:shadow-lg transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              سجل حالة استثنائية اليوم
-            </button>
-
-            {/* Language Selector */}
-            <select
-              value={exportLang}
-              onChange={(e) => setExportLang(e.target.value as ReportLang)}
-              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
-            >
-              <option value="ar" className="text-slate-900 dark:bg-slate-900">العربية (AR)</option>
-              <option value="en" className="text-slate-900 dark:bg-slate-900">English (EN)</option>
-              <option value="tr" className="text-slate-900 dark:bg-slate-900">Türkçe (TR)</option>
-            </select>
-
-            {/* Export CSV Action */}
-            <button
-              onClick={handleExportCSV}
-              type="button"
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-850/40 transition-all"
-            >
-              <Download className="w-4 h-4" />
-              تصدير كـ CSV
-            </button>
-
-            {/* Export PDF Action */}
-            <button
-              onClick={handleExportPDF}
-              type="button"
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-            >
-              <FileText className="w-4 h-4" />
-              تصدير تقرير PDF
-            </button>
           </div>
         </div>
 

@@ -95,41 +95,41 @@ export default function MetricCards() {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-6">
       {metrics.map((m, idx) => {
         const IconComponent = m.icon;
         return (
           <div
             key={idx}
-            className={`relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-6 shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between ${
+            className={`relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between ${
               m.highlight ? 'ring-1 ring-indigo-500/30 dark:ring-indigo-500/20' : ''
             }`}
           >
             {/* Background Glow */}
             <div className={`absolute -right-10 -top-10 w-24 h-24 rounded-full bg-gradient-to-br ${m.gradient} opacity-5 blur-xl group-hover:opacity-10 transition-opacity duration-300`} />
             
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{m.title}</p>
+            <div className="flex items-start justify-between gap-1">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 leading-tight">{m.title}</p>
                   {m.highlightBadge && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-500/10 dark:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 rounded-md">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-500/10 dark:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 rounded-md hidden sm:inline">
                       {m.highlightBadge}
                     </span>
                   )}
                 </div>
-                <h3 className={`text-2xl font-bold mt-2 tracking-tight ${m.valueColor || (m.highlight ? 'text-slate-900 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100')}`}>
+                <h3 className={`text-sm sm:text-2xl font-bold mt-1 sm:mt-2 tracking-tight truncate ${m.valueColor || (m.highlight ? 'text-slate-900 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100')}`}>
                   {m.value}
                 </h3>
               </div>
-              <div className={`p-3 rounded-xl bg-gradient-to-br ${m.colorClass} flex items-center justify-center`}>
-                <IconComponent className="w-6 h-6" />
+              <div className={`p-1.5 sm:p-3 rounded-xl bg-gradient-to-br ${m.colorClass} flex items-center justify-center shrink-0`}>
+                <IconComponent className="w-4 h-4 sm:w-6 sm:h-6" />
               </div>
             </div>
             
-            <div className="mt-4 border-t border-slate-50 dark:border-slate-800/50 pt-3 flex flex-col">
-              <span className="text-xs text-slate-400 dark:text-slate-500">{m.description}</span>
-              {m.detailBreakdown || null}
+            <div className="mt-2 sm:mt-4 border-t border-slate-50 dark:border-slate-800/50 pt-2 sm:pt-3 flex flex-col">
+              <span className="text-[9px] sm:text-xs text-slate-400 dark:text-slate-500 leading-tight">{m.description}</span>
+              <div className="hidden sm:block">{m.detailBreakdown || null}</div>
             </div>
           </div>
         );

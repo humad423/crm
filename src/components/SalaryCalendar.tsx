@@ -235,12 +235,13 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
           </h2>
         </div>
 
-        <p className="text-xs text-slate-400 dark:text-slate-500 mb-6 leading-relaxed">
+        <p className="text-xs text-slate-400 dark:text-slate-500 mb-4 sm:mb-6 leading-relaxed">
           وفقاً لقانون العمل التركي، يتم ترحيل ساعات الغياب والتأخير لتغطية ساعات العمل الإضافية أولاً بمعدل (1x) حتى نصل للنصاب الأسبوعي (45 ساعة)، وما زاد عنها يُحتسب بمعامل الضرب المعتمد (1.5x أو 2x).
         </p>
 
-        {/* Horizontal scrollable or multi-column grid below calendar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {/* Horizontal scrollable on mobile */}
+        <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 min-w-0">
           {calculationResult.weeklyBreakdowns.map((week) => {
             const hasDeficit = week.deficitHours > 0;
             const hasOvertimes = (week.weekdayOvertimeHours + week.saturdayOvertimeHours + week.sundayHolidayOvertimeHours) > 0;
@@ -304,7 +305,7 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
                 </div>
               </div>
             );
-          })}
+          })}</div>
         </div>
       </div>
     </div>
