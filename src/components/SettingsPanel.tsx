@@ -129,7 +129,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   };
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('tr-TR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
       maximumFractionDigits: 2,
@@ -205,7 +205,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     الراتب الأساسي الصافي الافتراضي (TRY)
                   </label>
                   <input
-                    type="number"
+                    type="text" inputMode="decimal" lang="en"
                     value={baseSalary}
                     onChange={(e) => setBaseSalary(Number(e.target.value))}
                     min="0"
@@ -242,7 +242,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                           
                           <div className="flex-1 flex items-center gap-1">
                             <input
-                              type="number"
+                              type="text" inputMode="decimal" lang="en"
                               value={currentVal}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -289,7 +289,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     معامل ضرب العمل الإضافي (الأيام العادية والسبت)
                   </label>
                   <input
-                    type="number"
+                    type="text" inputMode="decimal" lang="en"
                     value={multiplierWeekdaySat}
                     onChange={(e) => setMultiplierWeekdaySat(Number(e.target.value))}
                     step="0.1"
@@ -308,7 +308,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     معامل ضرب الأحد والعطل الرسمية
                   </label>
                   <input
-                    type="number"
+                    type="text" inputMode="decimal" lang="en"
                     value={multiplierSundayHoliday}
                     onChange={(e) => setMultiplierSundayHoliday(Number(e.target.value))}
                     step="0.1"
@@ -369,7 +369,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">تاريخ البداية</label>
-                                  <input type="date" value={schedForm.effectiveFrom}
+                                  <input type="date" lang="en-GB" dir="ltr" value={schedForm.effectiveFrom}
                                     onChange={(e) => setSchedForm(f => ({ ...f, effectiveFrom: e.target.value }))}
                                     className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                                 </div>
@@ -395,7 +395,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                                 </div>
                                 <div>
                                   <label className="text-[10px] font-bold text-slate-500 uppercase">استراحة (د)</label>
-                                  <input type="number" min="0" value={schedForm.breakMinutes}
+                                  <input type="text" inputMode="decimal" lang="en" min="0" value={schedForm.breakMinutes}
                                     onChange={(e) => setSchedForm(f => ({ ...f, breakMinutes: Number(e.target.value) }))}
                                     className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                                 </div>
@@ -455,7 +455,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase">تاريخ البداية *</label>
-                          <input type="date" value={schedForm.effectiveFrom}
+                          <input type="date" lang="en-GB" dir="ltr" value={schedForm.effectiveFrom}
                             onChange={(e) => setSchedForm(f => ({ ...f, effectiveFrom: e.target.value }))}
                             className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                         </div>
@@ -481,7 +481,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase">استراحة (د)</label>
-                          <input type="number" min="0" value={schedForm.breakMinutes}
+                          <input type="text" inputMode="decimal" lang="en" min="0" value={schedForm.breakMinutes}
                             onChange={(e) => setSchedForm(f => ({ ...f, breakMinutes: Number(e.target.value) }))}
                             className="w-full px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                         </div>
@@ -543,7 +543,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-455 dark:text-slate-500 uppercase">تاريخ البدء</label>
                       <input
-                        type="date"
+                        type="date" lang="en-GB" dir="ltr"
                         value={reportStart}
                         onChange={(e) => setReportStart(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold"
@@ -552,7 +552,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-455 dark:text-slate-500 uppercase">تاريخ النهاية</label>
                       <input
-                        type="date"
+                        type="date" lang="en-GB" dir="ltr"
                         value={reportEnd}
                         onChange={(e) => setReportEnd(e.target.value)}
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs font-semibold"

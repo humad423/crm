@@ -6,7 +6,7 @@ export default function MetricCards() {
   const { calculationResult, cumulativeBalance, cumulativeTotalEarned, cumulativeTotalPaid } = useSalary();
   
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('tr-TR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
       maximumFractionDigits: 2,

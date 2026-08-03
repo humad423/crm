@@ -12,7 +12,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
   const { exceptions, addException, deleteExceptionByDate, holidays } = useSalary();
   
   const [eventType, setEventType] = useState<ExceptionType>('overtime');
-  const [hours, setHours] = useState<number>(3);
+  const [hours, setHours] = useState<number | ''>('');
   const [overtimeType, setOvertimeType] = useState<OvertimeType>('weekday');
   const [multiplier, setMultiplier] = useState<number>(1.5);
   const [note, setNote] = useState<string>('');
@@ -46,7 +46,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
       if (existingExceptions.length > 0) {
         const primary = existingExceptions[0];
         setEventType(primary.type);
-        setHours(primary.hours || (autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 3));
+        setHours(primary.hours || '');
         setOvertimeType(primary.overtimeType || autoOtType);
         
         let initialMult = primary.multiplier;
@@ -58,7 +58,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
         setNote(primary.note || '');
       } else {
         setEventType('overtime');
-        setHours(autoOtType === 'saturday' || autoOtType === 'sunday' || autoOtType === 'holiday' ? 8 : 3);
+        setHours('');
         setMultiplier(autoOtType === 'holiday' ? 1.0 : (autoOtType === 'sunday' ? 2.0 : 1.5));
         setNote('');
       }
@@ -84,7 +84,7 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
     addException({
       date: dateStr,
       type: eventType,
-      hours: eventType === 'absence' ? undefined : Number(hours),
+      hours: eventType === 'absence' || hours === '' ? undefined : Number(hours),
       overtimeType: eventType === 'overtime' ? overtimeType : undefined,
       multiplier: eventType === 'overtime' ? Number(multiplier) : undefined,
       note: note.trim() || undefined,
@@ -243,11 +243,11 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-slate-400" />
                   <input
-                    type="number"
+                    type="text" inputMode="decimal" lang="en"
                     value={hours}
-                    onChange={(e) => setHours(Math.max(0.5, Number(e.target.value)))}
+                    onChange={(e) => setHours(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
                     step="0.5"
-                    min="0.5"
+                    min="0"
                     max="24"
                     required
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/30 transition-all font-semibold"
@@ -331,11 +331,11 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-slate-400" />
                 <input
-                  type="number"
+                  type="text" inputMode="decimal" lang="en"
                   value={hours}
-                  onChange={(e) => setHours(Math.max(0.5, Number(e.target.value)))}
+                  onChange={(e) => setHours(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
                   step="0.5"
-                  min="0.5"
+                  min="0"
                   max="9"
                   required
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/30 transition-all font-semibold"

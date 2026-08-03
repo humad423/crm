@@ -27,7 +27,7 @@ export function exportMonthToPDF(
   const daysOfWeek = lang === 'ar' ? daysOfWeekAr : (lang === 'tr' ? daysOfWeekTr : daysOfWeekEn);
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('tr-TR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
       maximumFractionDigits: 2,
@@ -263,7 +263,7 @@ export function exportMonthToPDF(
         </div>
         <div style="text-align: ${isRtl ? 'left' : 'right'};">
           <p class="meta-text" style="font-weight: bold; font-size: 13px; color: #1e3a8a;">${t.crmSystem}</p>
-          <p class="meta-text">${t.exportDate}: ${new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'tr-TR')}</p>
+          <p class="meta-text">${t.exportDate}: ${new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}</p>
         </div>
       </div>
 
@@ -389,7 +389,7 @@ export function exportRangeToPDF(
   }
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('tr-TR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
       maximumFractionDigits: 2,
@@ -599,7 +599,7 @@ export function exportRangeToPDF(
         </div>
         <div style="text-align: ${isRtl ? 'left' : 'right'};">
           <p class="meta-text" style="font-weight: bold; font-size: 13px; color: #1e3a8a;">${t.crmSystem}</p>
-          <p class="meta-text">${t.exportDate}: ${new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'tr-TR')}</p>
+          <p class="meta-text">${t.exportDate}: ${new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}</p>
         </div>
       </div>
 

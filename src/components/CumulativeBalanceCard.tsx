@@ -7,7 +7,7 @@ export default function CumulativeBalanceCard() {
   const { cumulativeBalance, cumulativeTotalEarned, cumulativeTotalPaid } = useSalary();
 
   const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('tr-TR', {
+    new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
       maximumFractionDigits: 0,

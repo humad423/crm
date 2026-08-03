@@ -42,7 +42,7 @@ export default function PaymentsLog() {
 
   // ─── Helpers ──────────────────────────────────────────────────
   const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('tr-TR', {
+    new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
       maximumFractionDigits: 2,
@@ -151,7 +151,7 @@ export default function PaymentsLog() {
               <div className="relative">
                 <Coins className="absolute right-3.5 top-3 w-4 h-4 text-slate-400" />
                 <input
-                  type="number"
+                  type="text" inputMode="decimal" lang="en"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="مثال: 5000"
@@ -170,7 +170,7 @@ export default function PaymentsLog() {
               <div className="relative">
                 <Calendar className="absolute right-3.5 top-3 w-4 h-4 text-slate-400" />
                 <input
-                  type="date"
+                  type="date" lang="en-GB" dir="ltr"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
@@ -291,7 +291,7 @@ export default function PaymentsLog() {
                         <td className="py-2.5 font-semibold text-slate-700 dark:text-slate-300 w-28">
                           {isEditingThis ? (
                             <input
-                              type="date"
+                              type="date" lang="en-GB" dir="ltr"
                               value={editing.date}
                               onChange={(e) => setEditing({ ...editing, date: e.target.value })}
                               className="w-full px-2 py-1 rounded-lg border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -320,7 +320,7 @@ export default function PaymentsLog() {
                         <td className="py-2.5 font-bold text-emerald-600 dark:text-emerald-400 w-36">
                           {isEditingThis ? (
                             <input
-                              type="number"
+                              type="text" inputMode="decimal" lang="en"
                               value={editing.amount}
                               min="1"
                               onChange={(e) => setEditing({ ...editing, amount: e.target.value })}

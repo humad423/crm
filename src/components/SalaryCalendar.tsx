@@ -25,7 +25,7 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
 
   // Helper to format currency
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('tr-TR', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
       maximumFractionDigits: 0,

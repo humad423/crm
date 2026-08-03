@@ -9,7 +9,8 @@ import SettingsPanel from '../components/SettingsPanel';
 import ExceptionModal from '../components/ExceptionModal';
 import AuthScreen from '../components/AuthScreen';
 import PaymentsLog from '../components/PaymentsLog';
-import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download, LogOut, FileText } from 'lucide-react';
+import IncomeDashboard from '../components/income/IncomeDashboard';
+import { Settings as SettingsIcon, Sun, Moon, CalendarDays, Plus, HelpCircle, HardDrive, Download, LogOut, FileText, TrendingUp, Layers } from 'lucide-react';
 import { generateMonthlyBreakdown } from '../utils/salaryCalculator';
 import { exportMonthToCSV } from '../utils/csvExporter';
 import { exportMonthToPDF } from '../utils/pdfExporter';
@@ -17,6 +18,23 @@ import { ReportLang } from '../utils/translations';
 
 export default function Home() {
   const { year, month, setMonthYear, settings, exceptions, holidays, calculationResult, isInitialized, user, logout, cumulativeBalance, cumulativeTotalEarned, cumulativeTotalPaid } = useSalary();
+  const [activeTab, setActiveTabState] = useState<'salary' | 'income'>('salary');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTab = localStorage.getItem('active_tab') as 'salary' | 'income';
+      if (savedTab === 'salary' || savedTab === 'income') {
+        setActiveTabState(savedTab);
+      }
+    }
+  }, []);
+
+  const setActiveTab = (tab: 'salary' | 'income') => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('active_tab', tab);
+    }
+  };
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -93,20 +111,47 @@ export default function Home() {
       
       {/* Top Header Navigation */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800/80 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Logo & Branding */}
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-xl shadow-md shadow-indigo-500/10">
-              <CalendarDays className="w-6 h-6" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+          
+          {/* Logo & Tab Navigation Switcher */}
+          <div className="flex items-center gap-3 sm:gap-6">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-xl shadow-md shadow-indigo-500/10">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div className="hidden lg:block">
+                <h1 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-wide">
+                  نظام إدارة الرواتب والإيرادات
+                </h1>
+              </div>
             </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 tracking-wide">
-                لوحة رواتب عمال تركيا
-              </h1>
-              <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-medium">
-                حساب الرواتب وساعات الإضافي والمقاصة الأسبوعية
-              </p>
-            </div>
+
+            {/* Main Tabs Switcher */}
+            <nav className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl gap-1">
+              <button
+                onClick={() => setActiveTab('salary')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'salary'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>الرواتب والعمل الإضافي</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('income')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'income'
+                    ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>تتبع الإيرادات ونمو الدخل</span>
+              </button>
+            </nav>
           </div>
 
           {/* Utility Tools */}
@@ -121,158 +166,167 @@ export default function Home() {
               {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5 text-amber-400" />}
             </button>
 
-            {/* Settings Trigger */}
-            <button
-               onClick={() => setIsSettingsOpen(true)}
-               className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
-               title="تعديل الإعدادات والرواتب"
-             >
-               <SettingsIcon className="w-4 h-4" />
-               <span className="hidden sm:inline">الإعدادات</span>
-             </button>
+            {/* Settings Trigger (Active when on salary tab) */}
+            {activeTab === 'salary' && (
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all"
+                title="تعديل الإعدادات والرواتب"
+              >
+                <SettingsIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">الإعدادات</span>
+              </button>
+            )}
 
-             {/* User display & Logout */}
-             <div className="flex items-center gap-1.5 sm:gap-2 border-r border-slate-100 dark:border-slate-800/80 pr-2 sm:pr-4 mr-1 sm:mr-2">
-               <span className="hidden md:inline text-xs font-bold text-slate-500 dark:text-slate-400">
-                 مرحباً، {user?.email?.split('@')[0]}
-               </span>
-               <button
-                 onClick={() => logout()}
-                 className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all"
-                 title="تسجيل الخروج"
-               >
-                 <LogOut className="w-5 h-5" />
-               </button>
-             </div>
-           </div>
+            {/* User display & Logout */}
+            <div className="flex items-center gap-1.5 sm:gap-2 border-r border-slate-100 dark:border-slate-800/80 pr-2 sm:pr-4 mr-1 sm:mr-2">
+              <span className="hidden md:inline text-xs font-bold text-slate-500 dark:text-slate-400">
+                مرحباً، {user?.email?.split('@')[0]}
+              </span>
+              <button
+                onClick={() => logout()}
+                className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all"
+                title="تسجيل الخروج"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-8 animate-fade-in">
         
-        {/* Sub-Header: Month/Year selector and Quick Actions */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3 sm:p-4 shadow-sm">
-          <div className="flex flex-col gap-3">
-            {/* Row 1: Selectors + Quick Log */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">الشهر</span>
-                <select
-                  value={month}
-                  onChange={handleMonthChange}
-                  className="px-2 sm:px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  {months.map((mName, idx) => (
-                    <option key={idx} value={idx} className="dark:bg-slate-900">{mName}</option>
-                  ))}
-                </select>
+        {/* Render Active Tab Content */}
+        {activeTab === 'income' ? (
+          <IncomeDashboard />
+        ) : (
+          <>
+            {/* Sub-Header: Month/Year selector and Quick Actions for Salary */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3 sm:p-4 shadow-sm">
+              <div className="flex flex-col gap-3">
+                {/* Row 1: Selectors + Quick Log */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">الشهر</span>
+                    <select
+                      value={month}
+                      onChange={handleMonthChange}
+                      className="px-2 sm:px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      {months.map((mName, idx) => (
+                        <option key={idx} value={idx} className="dark:bg-slate-900">{mName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">السنة</span>
+                    <select
+                      value={year}
+                      onChange={handleYearChange}
+                      className="px-2 sm:px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      {years.map((y) => (
+                        <option key={y} value={y} className="dark:bg-slate-900">{y}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex-1" />
+
+                  {/* Quick Log — always visible */}
+                  <button
+                    onClick={handleQuickLog}
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 transition-all whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">سجل حالة استثنائية اليوم</span>
+                    <span className="sm:hidden">سجل</span>
+                  </button>
+                </div>
+
+                {/* Row 2: Language + Export buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={exportLang}
+                    onChange={(e) => setExportLang(e.target.value as ReportLang)}
+                    className="px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="ar" className="text-slate-900 dark:bg-slate-900">AR</option>
+                    <option value="en" className="text-slate-900 dark:bg-slate-900">EN</option>
+                    <option value="tr" className="text-slate-900 dark:bg-slate-900">TR</option>
+                  </select>
+
+                  <button
+                    onClick={handleExportCSV}
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">تصدير CSV</span>
+                    <span className="sm:hidden">CSV</span>
+                  </button>
+
+                  <button
+                    onClick={handleExportPDF}
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">تصدير PDF</span>
+                    <span className="sm:hidden">PDF</span>
+                  </button>
+                </div>
               </div>
+            </div>
 
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">السنة</span>
-                <select
-                  value={year}
-                  onChange={handleYearChange}
-                  className="px-2 sm:px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-800 dark:text-slate-100 font-bold text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  {years.map((y) => (
-                    <option key={y} value={y} className="dark:bg-slate-900">{y}</option>
-                  ))}
-                </select>
+            {/* 1. Summary Metrics Dashboard */}
+            <section aria-label="Statistics Summary">
+              <MetricCards />
+            </section>
+
+            {/* 2. Interactive Calendar and Weekly Equalization Panel */}
+            <section aria-label="Monthly calendar and breakdowns">
+              <SalaryCalendar onSelectDate={setSelectedDate} />
+            </section>
+
+            {/* 3. Payments Registry Log */}
+            <section aria-label="Payments received log">
+              <PaymentsLog />
+            </section>
+
+            {/* 4. Turkish Labor Law Reference Guide */}
+            <section aria-label="Labor Law references" className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4">
+                <HelpCircle className="w-5 h-5 text-indigo-500" />
+                دليل قواعد الاحتساب وقانون العمل التركي
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                <div className="space-y-2">
+                  <h3 className="font-bold text-slate-700 dark:text-slate-300">📅 الشهر المحاسبي القياسي</h3>
+                  <p>
+                    يُعتبر الشهر المحاسبي لأغراض الأجور والخصومات دائماً <strong>30 يوماً</strong> بغض النظر عن أيام التقويم الفعلية (28 أو 31). يُحتسب خصم غياب اليوم الكامل كأجرة يوم عمل واحدة (الراتب ÷ 30).
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-bold text-slate-700 dark:text-slate-300">⏱️ ساعات العمل الشهرية</h3>
+                  <p>
+                    مجموع ساعات العمل الشهرية المعتمدة هي <strong>225 ساعة</strong>. تُحسب أجرة الساعة العادية بقسمة الراتب الأساسي على 225. يُحسب خصم ساعات التأخير بضرب ساعات التأخر في أجرة الساعة العادية.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-bold text-slate-700 dark:text-slate-300">⚖️ قاعدة المقاصة الأسبوعية (Denkleştirme)</h3>
+                  <p>
+                    لا تُدفع علاوة الإضافي (1.5x أو 2x) إلا بعد استيفاء <strong>45 ساعة عمل أسبوعية</strong>. أي غياب أو تأخير خلال الأسبوع يُغظى أولاً بساعات العمل الإضافية أو عطلة نهاية الأسبوع وتُدفع بمعدل عادي (1x) لتعويض النقص.
+                  </p>
+                </div>
               </div>
-
-              <div className="flex-1" />
-
-              {/* Quick Log — always visible */}
-              <button
-                onClick={handleQuickLog}
-                type="button"
-                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 transition-all whitespace-nowrap"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">سجل حالة استثنائية اليوم</span>
-                <span className="sm:hidden">سجل</span>
-              </button>
-            </div>
-
-            {/* Row 2: Language + Export buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <select
-                value={exportLang}
-                onChange={(e) => setExportLang(e.target.value as ReportLang)}
-                className="px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-slate-700 dark:text-slate-200 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              >
-                <option value="ar" className="text-slate-900 dark:bg-slate-900">AR</option>
-                <option value="en" className="text-slate-900 dark:bg-slate-900">EN</option>
-                <option value="tr" className="text-slate-900 dark:bg-slate-900">TR</option>
-              </select>
-
-              <button
-                onClick={handleExportCSV}
-                type="button"
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">تصدير CSV</span>
-                <span className="sm:hidden">CSV</span>
-              </button>
-
-              <button
-                onClick={handleExportPDF}
-                type="button"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">تصدير PDF</span>
-                <span className="sm:hidden">PDF</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 1. Summary Metrics Dashboard */}
-        <section aria-label="Statistics Summary">
-          <MetricCards />
-        </section>
-
-        {/* 2. Interactive Calendar and Weekly Equalization Panel */}
-        <section aria-label="Monthly calendar and breakdowns">
-          <SalaryCalendar onSelectDate={setSelectedDate} />
-        </section>
-
-        {/* 3. Payments Registry Log */}
-        <section aria-label="Payments received log">
-          <PaymentsLog />
-        </section>
-
-        {/* 3. Turkish Labor Law Reference Guide */}
-        <section aria-label="Labor Law references" className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm">
-          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-4">
-            <HelpCircle className="w-5 h-5 text-indigo-500" />
-            دليل قواعد الاحتساب وقانون العمل التركي
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-700 dark:text-slate-300">📅 الشهر المحاسبي القياسي</h3>
-              <p>
-                يُعتبر الشهر المحاسبي لأغراض الأجور والخصومات دائماً <strong>30 يوماً</strong> بغض النظر عن أيام التقويم الفعلية (28 أو 31). يُحتسب خصم غياب اليوم الكامل كأجرة يوم عمل واحدة (الراتب ÷ 30).
-              </p>
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-700 dark:text-slate-300">⏱️ ساعات العمل الشهرية</h3>
-              <p>
-                مجموع ساعات العمل الشهرية المعتمدة هي <strong>225 ساعة</strong>. تُحسب أجرة الساعة العادية بقسمة الراتب الأساسي على 225. يُحسب خصم ساعات التأخير بضرب ساعات التأخر في أجرة الساعة العادية.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-bold text-slate-700 dark:text-slate-300">⚖️ قاعدة المقاصة الأسبوعية (Denkleştirme)</h3>
-              <p>
-                لا تُدفع علاوة الإضافي (1.5x أو 2x) إلا بعد استيفاء <strong>45 ساعة عمل أسبوعية</strong>. أي غياب أو تأخير خلال الأسبوع يُغظى أولاً بساعات العمل الإضافية أو عطلة نهاية الأسبوع وتُدفع بمعدل عادي (1x) لتعويض النقص.
-              </p>
-            </div>
-          </div>
-        </section>
+            </section>
+          </>
+        )}
 
       </main>
 
@@ -282,7 +336,7 @@ export default function Home() {
       <ExceptionModal dateStr={selectedDate} onClose={() => setSelectedDate(null)} />
 
       {/* Footer */}
-      <footer className="mt-auto py-6 border-t border-slate-100 dark:border-slate-900/60 bg-white dark:bg-slate-950 transition-colors text-center text-xs text-slate-400 dark:text-slate-655">
+      <footer className="mt-auto py-6 border-t border-slate-100 dark:border-slate-900/60 bg-white dark:bg-slate-950 transition-colors text-center text-xs text-slate-400 dark:text-slate-600">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-2">
           <HardDrive className="w-3.5 h-3.5" />
           <span>يتم حفظ جميع البيانات محلياً في متصفحك (LocalStorage).</span>
