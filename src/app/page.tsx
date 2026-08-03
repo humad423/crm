@@ -207,7 +207,7 @@ export default function Home() {
             <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3 sm:p-4 shadow-sm">
               <div className="flex flex-col gap-3">
                 {/* Row 1: Selectors + Quick Log */}
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">الشهر</span>
                     <select
@@ -240,11 +240,11 @@ export default function Home() {
                   <button
                     onClick={handleQuickLog}
                     type="button"
-                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 transition-all whitespace-nowrap"
+                    className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 transition-all whitespace-nowrap flex-1 sm:flex-initial"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline">سجل حالة استثنائية اليوم</span>
-                    <span className="sm:hidden">سجل</span>
+                    <span className="sm:hidden">سجل حالة</span>
                   </button>
                 </div>
 

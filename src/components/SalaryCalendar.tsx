@@ -55,9 +55,9 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
   return (
     <div className="flex flex-col gap-8 w-full">
       {/* Calendar Grid Section - Full Width */}
-      <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+      <div className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-sm overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="p-2 bg-indigo-500/10 text-indigo-600 rounded-lg">
               <CalendarIcon className="w-5 h-5" />
             </div>
@@ -65,7 +65,7 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
               تقويم شهر {monthNames[month]} / {year}
             </h2>
           </div>
-          <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 rounded-full">
+          <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-550 dark:text-slate-400 rounded-full w-full sm:w-auto text-center truncate">
             الدوام: {activeSchedule.dailyHours.toFixed(1)}س/يوم · {activeSchedule.weeklyHours.toFixed(1)}س/أسبوع
           </span>
         </div>
@@ -136,7 +136,7 @@ export default function SalaryCalendar({ onSelectDate }: SalaryCalendarProps) {
               <div
                 key={cell.key}
                 onClick={() => onSelectDate(dateStr)}
-                className={`relative aspect-square flex flex-col justify-between p-1 sm:p-2 rounded-2xl border ${borderStyle} ${bgStyle} cursor-pointer group hover:scale-[1.02] hover:shadow-sm transition-all duration-200`}
+                className={`relative aspect-square flex flex-col justify-between p-1 sm:p-2 rounded-2xl border ${borderStyle} ${bgStyle} cursor-pointer group hover:scale-[1.02] hover:shadow-sm transition-all duration-200 overflow-hidden min-w-0`}
               >
                 {/* Day Header: number & holiday name indicator */}
                 <div className="flex items-start justify-between">
