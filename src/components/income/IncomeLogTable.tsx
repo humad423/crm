@@ -247,22 +247,22 @@ export default function IncomeLogTable({ onOpenAddModal, onOpenEditModal }: Inco
             تصفية بالتاريخ:
           </span>
           <div className="flex items-center gap-2 flex-1 flex-wrap">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">من:</label>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap w-8 sm:w-auto">من:</label>
               <input
                 type="date" lang="en-GB" dir="ltr"
                 value={dateFrom}
                 onChange={(e) => { setDateFrom(e.target.value); resetPage(); }}
-                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">إلى:</label>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap w-8 sm:w-auto">إلى:</label>
               <input
                 type="date" lang="en-GB" dir="ltr"
                 value={dateTo}
                 onChange={(e) => { setDateTo(e.target.value); resetPage(); }}
-                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             {(dateFrom || dateTo) && (

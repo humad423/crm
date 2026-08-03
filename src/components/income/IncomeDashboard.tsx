@@ -148,8 +148,8 @@ export default function IncomeDashboard() {
               <TrendingUp className="w-5 h-5" />
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex flex-col">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <div className="flex flex-col w-full sm:w-auto">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5">من تاريخ</span>
                 <input
                   type="date" lang="en-GB" dir="ltr"
@@ -159,7 +159,7 @@ export default function IncomeDashboard() {
                 />
               </div>
 
-              <div className="flex flex-col">
+              <div className="flex flex-col w-full sm:w-auto">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5">إلى تاريخ</span>
                 <input
                   type="date" lang="en-GB" dir="ltr"

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
 import './globals.css';
 import { SalaryProvider } from '../context/SalaryContext';
@@ -15,6 +15,13 @@ export const metadata: Metadata = {
   description: 'لوحة تحكم تفاعلية لحساب الرواتب وتتبع نمو الإيرادات ومصادر الدخل الشخصية.',
   keywords: 'رواتب تركيا, العمل الإضافي, إيرادات شخصية, مصادر الدخل, نمو الإيرادات, Denkleştirme',
   authors: [{ name: 'Antigravity Developer' }],
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
