@@ -137,7 +137,8 @@ export default function Home() {
                 }`}
               >
                 <CalendarDays className="w-4 h-4" />
-                <span>الرواتب والعمل الإضافي</span>
+                <span className="hidden sm:inline">الرواتب والعمل الإضافي</span>
+                <span className="sm:hidden">الرواتب</span>
               </button>
 
               <button
@@ -149,7 +150,8 @@ export default function Home() {
                 }`}
               >
                 <TrendingUp className="w-4 h-4" />
-                <span>تتبع الإيرادات ونمو الدخل</span>
+                <span className="hidden sm:inline">تتبع الإيرادات ونمو الدخل</span>
+                <span className="sm:hidden">الإيرادات</span>
               </button>
             </nav>
           </div>
@@ -204,8 +206,8 @@ export default function Home() {
         ) : (
           <>
             {/* Sub-Header: Month/Year selector and Quick Actions for Salary */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3 sm:p-4 shadow-sm">
-              <div className="flex flex-col gap-3">
+            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3 sm:p-4 shadow-sm min-w-0">
+              <div className="flex flex-col gap-3 min-w-0">
                 {/* Row 1: Selectors + Quick Log */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                   <div className="flex flex-col">
@@ -284,17 +286,17 @@ export default function Home() {
             </div>
 
             {/* 1. Summary Metrics Dashboard */}
-            <section aria-label="Statistics Summary">
+            <section aria-label="Statistics Summary" className="w-full min-w-0">
               <MetricCards />
             </section>
 
             {/* 2. Interactive Calendar and Weekly Equalization Panel */}
-            <section aria-label="Monthly calendar and breakdowns">
+            <section aria-label="Monthly calendar and breakdowns" className="w-full min-w-0">
               <SalaryCalendar onSelectDate={setSelectedDate} />
             </section>
 
             {/* 3. Payments Registry Log */}
-            <section aria-label="Payments received log">
+            <section aria-label="Payments received log" className="w-full min-w-0">
               <PaymentsLog />
             </section>
 

@@ -220,7 +220,7 @@ export default function PaymentsLog() {
         </div>
 
         {/* ── Right: Payments Table ───────────────────────── */}
-        <div className="lg:col-span-2 flex flex-col">
+        <div className="lg:col-span-2 flex flex-col min-w-0">
 
           {/* Toolbar: Filter + Search */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -267,7 +267,7 @@ export default function PaymentsLog() {
               </p>
             </div>
           ) : (
-            <div className="flex-1 overflow-x-auto">
+            <div className="flex-1 overflow-x-auto min-w-0">
               <table className="w-full border-collapse text-right text-xs">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold">

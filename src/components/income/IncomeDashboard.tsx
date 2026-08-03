@@ -68,7 +68,7 @@ export default function IncomeDashboard() {
   const dashboardSummary = getDashboardSummary(dateFilterFrom, dateFilterTo);
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-6 animate-fade-in pb-12 w-full min-w-0">
       {/* Dashboard Sub-Header Bar: Currency Toggle, Rate input, Selectors & Actions */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
         
