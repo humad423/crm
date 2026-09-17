@@ -9,7 +9,7 @@ export default function MetricCards() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(val);
   };
 
@@ -77,7 +77,11 @@ export default function MetricCards() {
     {
       title: 'صافي الراتب المستحق',
       value: formatCurrency(calculationResult.netSalary),
-      description: 'الراتب النهائي بعد المقاصة والخصومات',
+      description: calculationResult.isCurrentMonth
+        ? `المستحق عن الأيام المنتهية (${calculationResult.completedDays ?? 0} يوم)`
+        : calculationResult.isFutureMonth
+        ? 'الشهر لم يبدأ بعد'
+        : 'الراتب النهائي بعد المقاصة والخصومات',
       icon: Coins,
       colorClass: 'from-indigo-500/10 to-purple-500/10 text-indigo-650 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/30',
       gradient: 'from-indigo-500 to-purple-650',
@@ -101,29 +105,37 @@ export default function MetricCards() {
         return (
           <div
             key={idx}
-            className={`relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3 sm:p-6 shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between ${
+            className={`relative overflow-hidden bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 p-3 sm:p-5 shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between ${
               m.highlight ? 'ring-1 ring-indigo-500/30 dark:ring-indigo-500/20' : ''
             }`}
           >
             {/* Background Glow */}
             <div className={`absolute -right-10 -top-10 w-24 h-24 rounded-full bg-gradient-to-br ${m.gradient} opacity-5 blur-xl group-hover:opacity-10 transition-opacity duration-300`} />
             
-            <div className="flex items-start justify-between gap-1">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className="text-[10px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 leading-tight">{m.title}</p>
+            <div>
+              {/* Header: Title and Icon */}
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                  <p className="text-[11px] sm:text-sm font-medium text-slate-500 dark:text-slate-400 leading-tight">{m.title}</p>
                   {m.highlightBadge && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-500/10 dark:bg-indigo-500/25 text-indigo-700 dark:text-indigo-300 rounded-md hidden sm:inline">
                       {m.highlightBadge}
                     </span>
                   )}
                 </div>
-                <h3 className={`text-sm sm:text-2xl font-bold mt-1 sm:mt-2 tracking-tight truncate ${m.valueColor || (m.highlight ? 'text-slate-900 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100')}`}>
+                <div className={`p-1.5 sm:p-2.5 rounded-xl bg-gradient-to-br ${m.colorClass} flex items-center justify-center shrink-0`}>
+                  <IconComponent className="w-4 h-4 sm:w-5 sm:h-5" />
+                </div>
+              </div>
+
+              {/* Metric Value: Unconstrained width, no truncate */}
+              <div className="mt-2 sm:mt-3">
+                <h3
+                  dir="ltr"
+                  className={`text-base sm:text-xl xl:text-2xl font-bold tracking-tight text-right ${m.valueColor || (m.highlight ? 'text-slate-900 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100')}`}
+                >
                   {m.value}
                 </h3>
-              </div>
-              <div className={`p-1.5 sm:p-3 rounded-xl bg-gradient-to-br ${m.colorClass} flex items-center justify-center shrink-0`}>
-                <IconComponent className="w-4 h-4 sm:w-6 sm:h-6" />
               </div>
             </div>
             

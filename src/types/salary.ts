@@ -108,4 +108,10 @@ export interface MonthlyCalculationResult {
   totalPaymentsReceived: number;
   remainingBalance: number;
   currentMonthPayments: Payment[];
+
+  // Accrual / elapsed days attributes
+  completedDays?: number;
+  earnedBaseSalary?: number;
+  isCurrentMonth?: boolean;
+  isFutureMonth?: boolean;
 }

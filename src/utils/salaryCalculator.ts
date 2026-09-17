@@ -377,6 +377,31 @@ export function calculateMonthlySalary(
   const dailyWage = baseSalary / 30;
   const regularHourlyWage = baseSalary / 225;
 
+  // Determine month temporal status (past, current, future)
+  const now = new Date();
+  const realYear = now.getFullYear();
+  const realMonth = now.getMonth(); // 0-based
+  const realDay = now.getDate();
+
+  const isPastMonth = year < realYear || (year === realYear && month < realMonth);
+  const isFutureMonth = year > realYear || (year === realYear && month > realMonth);
+  const isCurrentMonth = year === realYear && month === realMonth;
+
+  // Accrual / ended days calculation:
+  // - For past months: all 30 accounting days are completed.
+  // - For future months: 0 days have occurred.
+  // - For current month: only days that have ended count (realDay - 1, or realDay if after working hours >= 19:00).
+  let completedDays = 30;
+  if (isFutureMonth) {
+    completedDays = 0;
+  } else if (isCurrentMonth) {
+    const currentHour = now.getHours();
+    const daysEnded = currentHour >= 19 ? realDay : Math.max(0, realDay - 1);
+    completedDays = Math.min(30, daysEnded);
+  }
+
+  const earnedBaseSalary = isPastMonth ? baseSalary : completedDays * dailyWage;
+
   // 2. Generate daily breakdown & perform weekly calculations using resolved dailyHours
   const dayBreakdowns = generateMonthlyBreakdown(year, month, settings, exceptions, holidays, dailyHours);
   const weeklyBreakdowns = calculateWeeklyEqualization(dayBreakdowns, settings, weeklyHours);
@@ -388,8 +413,12 @@ export function calculateMonthlySalary(
   let overtime1_5xHours = 0;
   let overtime2xHours = 0;
 
-  // Delay hours and absence days are counted globally for deductions
+  // Delay hours and absence days are counted for deductions on elapsed/recorded days
   dayBreakdowns.forEach((day) => {
+    if (isFutureMonth) return;
+    const dayNum = parseInt(day.date.split('-')[2], 10);
+    if (isCurrentMonth && dayNum > realDay) return;
+
     totalAbsenceDays += day.absenceDays;
     totalDelayHours += day.delayHours;
   });
@@ -413,8 +442,13 @@ export function calculateMonthlySalary(
   const overtime2xPay = overtime2xHours * regularHourlyWage * multiplierSundayHoliday;
   const totalOvertimePay = overtime1xPay + overtime1_5xPay + overtime2xPay;
 
-  // - Net salary calculation: Base Salary - Deductions + Overtime Pay
-  const netSalary = baseSalary - totalAbsenceDeduction - totalDelayDeduction + totalOvertimePay;
+  // - Net salary calculation:
+  // For past month: Base Salary - Deductions + Overtime Pay
+  // For current month: Earned Base Salary (ended days) - Deductions + Overtime Pay
+  // For future month: 0
+  const netSalary = isFutureMonth
+    ? 0
+    : Math.max(0, earnedBaseSalary - totalAbsenceDeduction - totalDelayDeduction + totalOvertimePay);
 
   return {
     baseSalary,
@@ -437,5 +471,9 @@ export function calculateMonthlySalary(
     totalPaymentsReceived: 0,
     remainingBalance: netSalary,
     currentMonthPayments: [],
+    completedDays,
+    earnedBaseSalary,
+    isCurrentMonth,
+    isFutureMonth,
   };
 }

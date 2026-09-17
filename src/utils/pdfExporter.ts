@@ -30,7 +30,7 @@ export function exportMonthToPDF(
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(val);
   };
 
@@ -112,25 +112,7 @@ export function exportMonthToPDF(
     `;
   });
 
-  // Generate Weekly Breakdown HTML cards
-  let weeklyHtml = '';
-  calculationResult.weeklyBreakdowns.forEach((week) => {
-    weeklyHtml += `
-      <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; background-color: #f8fafc; font-size: 11px;">
-        <div style="font-weight: bold; color: #1e293b; margin-bottom: 5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; display: flex; justify-content: space-between;">
-          <span>${t.week} ${week.weekIndex}</span>
-          <span style="color: ${week.deficitHours > 0 ? '#d97706' : '#10b981'}">${week.deficitHours > 0 ? `${t.deficit}: ${week.deficitHours}${t.hours}` : t.completed}</span>
-        </div>
-        <div style="margin-bottom: 4px;">${t.actualHoursLabel}: <b>${week.actualWeekdayHours}${t.hours} / ${week.expectedHours}${t.hours}</b></div>
-        <div style="margin-bottom: 4px;">${t.absences}/${t.delays}: <b>${week.absenceDeductions} غ | ${week.delayHours}${t.hours}</b></div>
-        <div style="border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-top: 4px;">
-          <div>1.0x: <b>${week.overtimeHours1x}س</b></div>
-          <div>1.5x: <b>${week.overtimeHours1_5x}س</b></div>
-          <div>2.0x: <b>${week.overtimeHours2x}س</b></div>
-        </div>
-      </div>
-    `;
-  });
+
 
   // Generate Payments list HTML rows
   let paymentsRowsHtml = '';
@@ -269,30 +251,6 @@ export function exportMonthToPDF(
 
 
 
-      <div style="display: grid; grid-template-cols: 2fr 1fr; gap: 20px; margin-bottom: 25px; align-items: start;">
-        <div>
-          <h2 class="section-title">${t.weeklyEqualization}</h2>
-          <div style="display: grid; grid-template-cols: repeat(5, 1fr); gap: 8px;">
-            ${weeklyHtml}
-          </div>
-        </div>
-        <div>
-          <h2 class="section-title">${t.advancesReceived}</h2>
-          <table class="table-container">
-            <thead>
-              <tr style="background-color: #475569;">
-                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 30%">${t.date}</th>
-                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 45%">${t.description}</th>
-                <th style="padding: 6px; background-color: #475569; border-color: #475569; width: 25%">${t.amount}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${paymentsRowsHtml}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       <h2 class="section-title">${t.dailyAttendanceLog}</h2>
       <table class="table-container">
         <thead>
@@ -311,6 +269,24 @@ export function exportMonthToPDF(
         </tbody>
       </table>
 
+      ${paymentsList.length > 0 ? `
+        <div style="margin-top: 20px;">
+          <h2 class="section-title">${t.advancesReceived}</h2>
+          <table class="table-container">
+            <thead>
+              <tr style="background-color: #475569;">
+                <th style="padding: 6px; width: 25%; text-align: center;">${t.date}</th>
+                <th style="padding: 6px; width: 50%; text-align: ${isRtl ? 'right' : 'left'};">${t.description}</th>
+                <th style="padding: 6px; width: 25%; text-align: center;">${t.amount}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paymentsRowsHtml}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+
       <div class="summary-footer">
         <div class="summary-pill">
           <span class="pill-label">${t.baseSalary}</span>
@@ -328,14 +304,12 @@ export function exportMonthToPDF(
           <span class="pill-label" style="color: #2563eb;">${t.netSalaryDue}</span>
           <span class="pill-value" style="color: #1d4ed8;">${formatCurrency(calculationResult.netSalary)}</span>
         </div>
+        ${calculationResult.totalPaymentsReceived > 0 ? `
         <div class="summary-pill" style="border-color: #cbd5e1;">
           <span class="pill-label" style="color: #475569;">${t.totalReceived}</span>
-          <span class="pill-value" style="color: #334155;">${formatCurrency(cumulativeTotalPaid)}</span>
+          <span class="pill-value" style="color: #334155;">${formatCurrency(calculationResult.totalPaymentsReceived)}</span>
         </div>
-        <div class="summary-pill" style="border-color: ${remainingBorder}; background-color: ${remainingBg};">
-          <span class="pill-label" style="color: ${remainingTextColor};">${remainingTitle} (${lang === 'ar' ? 'الإجمالي' : lang === 'tr' ? 'Toplam' : 'Overall'})</span>
-          <span class="pill-value" style="color: ${remainingTextColor};">${formatCurrency(Math.abs(remaining))}</span>
-        </div>
+        ` : ''}
       </div>
     </body>
     </html>
@@ -392,7 +366,7 @@ export function exportRangeToPDF(
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'TRY',
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(val);
   };
 

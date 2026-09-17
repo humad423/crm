@@ -117,7 +117,7 @@ export default function CumulativeBalanceCard() {
                 <ArrowUpRight className="w-3 h-3 text-emerald-400" />
                 إجمالي الرواتب (يناير→الشهر الحالي)
               </div>
-              <p className="text-xs font-bold text-white truncate">
+              <p className="text-xs font-bold text-white" dir="ltr">
                 {formatCurrency(cumulativeTotalEarned)}
               </p>
             </div>
@@ -126,7 +126,7 @@ export default function CumulativeBalanceCard() {
                 <ArrowDownRight className="w-3 h-3 text-rose-400" />
                 إجمالي الدفعات المستلمة
               </div>
-              <p className="text-xs font-bold text-white truncate">
+              <p className="text-xs font-bold text-white" dir="ltr">
                 {formatCurrency(cumulativeTotalPaid)}
               </p>
             </div>
