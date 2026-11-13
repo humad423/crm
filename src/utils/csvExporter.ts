@@ -1,6 +1,7 @@
 import { DayBreakdown, MonthlyCalculationResult, UserSettings, ExceptionEvent, Payment, Holiday } from '../types/salary';
 import { calculateMonthlySalary } from './salaryCalculator';
 import { ReportLang, reportTranslations } from './translations';
+import { csvCell } from './escape';
 
 /**
  * Exports the monthly salary and overtime report as a CSV file.
@@ -97,7 +98,7 @@ export function exportRangeToCSV(
   
   // Find all year-month pairs in the range
   const monthsInRange: { year: number; month: number }[] = [];
-  let curr = new Date(start.getFullYear(), start.getMonth(), 1);
+  const curr = new Date(start.getFullYear(), start.getMonth(), 1);
   const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
   
   while (curr <= targetEnd) {
@@ -167,7 +168,7 @@ export function exportRangeToCSV(
     csvContent += `-,${t.noPayments},-\n`;
   } else {
     rangePayments.forEach(p => {
-      csvContent += `${p.date},"${p.note || ''}",${p.amount.toFixed(2)}\n`;
+      csvContent += `${p.date},${csvCell(p.note || '')},${p.amount.toFixed(2)}\n`;
     });
   }
 

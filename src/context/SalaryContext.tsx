@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { UserSettings, ExceptionEvent, Holiday, MonthlyCalculationResult, Payment, WorkSchedulePeriod } from '../types/salary';
 import { calculateMonthlySalary, getScheduleForMonth } from '../utils/salaryCalculator';
 import { supabase } from '../utils/supabaseClient';
@@ -70,9 +70,25 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   
   // Custom monthly salary and payments state
-  const [monthlySalaries, setMonthlySalaries] = useState<{ [key: string]: number }>({});
+  const [monthlySalaries, setMonthlySalariesState] = useState<{ [key: string]: number }>({});
+  // Always-current copy: Settings saves several months in a loop, where the closure value would be stale.
+  const monthlySalariesRef = useRef<{ [key: string]: number }>({});
+  const setMonthlySalaries = (next: { [key: string]: number }) => {
+    monthlySalariesRef.current = next;
+    setMonthlySalariesState(next);
+  };
   const [payments, setPayments] = useState<Payment[]>([]);
   const [schedulePeriods, setSchedulePeriods] = useState<WorkSchedulePeriod[]>([]);
+
+  // Surfaces failed database writes instead of silently pretending they were saved.
+  const reportDbError = (action: string, error: { message?: string } | null | undefined): boolean => {
+    if (!error) return false;
+    console.error(`Supabase ${action} failed:`, error);
+    if (typeof window !== 'undefined') {
+      window.alert(`تعذّر حفظ التغيير (${action}). تحقق من الاتصال وحاول مرة أخرى.\n${error.message ?? ''}`);
+    }
+    return true;
+  };
 
   // 1. Listen to Auth Changes and load session on mount
   useEffect(() => {
@@ -88,8 +104,10 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
         const savedYear = localStorage.getItem('salary_selected_year');
         const savedMonth = localStorage.getItem('salary_selected_month');
-        if (savedYear) initialYear = Number(savedYear);
-        if (savedMonth) initialMonth = Number(savedMonth);
+        const parsedYear = Number(savedYear);
+        const parsedMonth = Number(savedMonth);
+        if (savedYear && Number.isInteger(parsedYear) && parsedYear >= 2000 && parsedYear <= 2100) initialYear = parsedYear;
+        if (savedMonth && Number.isInteger(parsedMonth) && parsedMonth >= 0 && parsedMonth <= 11) initialMonth = parsedMonth;
         
         setYear(initialYear);
         setMonth(initialMonth);
@@ -127,6 +145,8 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           multiplierSundayHoliday: Number(settingsData.multiplier_sunday_holiday),
           googleApiKey: settingsData.google_api_key || '',
         });
+      } else if (settingsErr) {
+        console.error('Failed to load settings:', settingsErr);
       } else {
         // Insert defaults if none exist
         await supabase.from('user_settings').insert({
@@ -146,6 +166,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('user_id', userId);
 
+      if (exceptionsErr) console.error('Failed to load exceptions:', exceptionsErr);
       if (exceptionsData) {
         const mappedExceptions: ExceptionEvent[] = exceptionsData.map((e) => ({
           id: e.id,
@@ -165,6 +186,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('user_id', userId);
 
+      if (monthlySalariesErr) console.error('Failed to load monthly salaries:', monthlySalariesErr);
       if (monthlySalariesData) {
         const salariesMap: { [key: string]: number } = {};
         monthlySalariesData.forEach((s) => {
@@ -181,6 +203,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('user_id', userId);
 
+      if (paymentsErr) console.error('Failed to load payments:', paymentsErr);
       if (paymentsData) {
         const mappedPayments: Payment[] = paymentsData.map((p) => ({
           id: p.id,
@@ -281,13 +304,16 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     
     if (error) return { error };
     
-    if (data.user) {
+    // Only migrate when a session exists (if e-mail confirmation is enabled there is none yet,
+    // and every insert would be rejected by row-level security).
+    if (data.user && data.session) {
       const newUserId = data.user.id;
       
       // Migrate existing local storage exceptions and settings to Supabase
       try {
+        const failures: unknown[] = [];
         // A. Migrate settings
-        await supabase.from('user_settings').upsert({
+        const { error: settingsMigErr } = await supabase.from('user_settings').upsert({
           user_id: newUserId,
           base_salary: settings.baseSalary,
           standard_weekly_hours: settings.standardWeeklyHours,
@@ -296,6 +322,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
           multiplier_sunday_holiday: settings.multiplierSundayHoliday,
           google_api_key: settings.googleApiKey,
         });
+        if (settingsMigErr) failures.push(settingsMigErr);
 
         // B. Migrate exceptions
         if (exceptions.length > 0) {
@@ -308,7 +335,8 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
             multiplier: e.multiplier,
             note: e.note || '',
           }));
-          await supabase.from('exceptions').insert(dbExceptions);
+          const { error: e1 } = await supabase.from('exceptions').insert(dbExceptions);
+          if (e1) failures.push(e1);
         }
 
         // Migrate monthly salaries
@@ -322,7 +350,8 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
               base_salary: sal,
             };
           });
-          await supabase.from('monthly_salaries').upsert(dbSalaries);
+          const { error: e2 } = await supabase.from('monthly_salaries').upsert(dbSalaries);
+          if (e2) failures.push(e2);
         }
 
         // Migrate payments
@@ -338,10 +367,32 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
               note: p.note || '',
             };
           });
-          await supabase.from('payments').insert(dbPayments);
+          const { error: e3 } = await supabase.from('payments').insert(dbPayments);
+          if (e3) failures.push(e3);
         }
 
-        // C. Clear local storage offline keys
+        // Migrate work schedule periods
+        if (schedulePeriods.length > 0) {
+          const dbPeriods = schedulePeriods.map((sp) => ({
+            user_id: newUserId,
+            effective_from: sp.effectiveFrom,
+            label: sp.label || '',
+            start_time: sp.startTime,
+            end_time: sp.endTime,
+            break_minutes: sp.breakMinutes,
+          }));
+          const { error: e4 } = await supabase.from('schedule_periods').insert(dbPeriods);
+          if (e4) failures.push(e4);
+        }
+
+        if (failures.length > 0) {
+          // Keep the local copy so nothing is lost.
+          console.error('Local data migration partially failed:', failures);
+          return { error: null };
+        }
+
+        // C. Clear local storage offline keys (only after everything was copied)
+        localStorage.removeItem('salary_schedule_periods');
         localStorage.removeItem('salary_settings');
         localStorage.removeItem('salary_exceptions');
         localStorage.removeItem('salary_monthly_salaries');
@@ -360,12 +411,13 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   // 4. Data Mutation Functions (Sync to DB if logged in, otherwise LocalStorage)
   const updateSettings = async (newSettings: Partial<UserSettings>) => {
+    const previous = settings;
     const updated = { ...settings, ...newSettings };
     setSettings(updated);
 
     if (user) {
       // Sync to Supabase
-      await supabase.from('user_settings').upsert({
+      const { error } = await supabase.from('user_settings').upsert({
         user_id: user.id,
         base_salary: updated.baseSalary,
         standard_weekly_hours: updated.standardWeeklyHours,
@@ -375,6 +427,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         google_api_key: updated.googleApiKey,
         updated_at: new Date().toISOString(),
       });
+      if (reportDbError('الإعدادات', error)) setSettings(previous);
     } else {
       // Save locally
       localStorage.setItem('salary_settings', JSON.stringify(updated));
@@ -392,25 +445,27 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
     if (user) {
       // Delete conflicts in Supabase first
+      let conflictErr: { message?: string } | null = null;
       if (eventInput.type === 'absence' || eventInput.type === 'delay') {
-        await supabase
+        ({ error: conflictErr } = await supabase
           .from('exceptions')
           .delete()
           .eq('user_id', user.id)
           .eq('date', eventInput.date)
-          .in('type', ['absence', 'delay']);
+          .in('type', ['absence', 'delay']));
       } else if (eventInput.type === 'overtime') {
-        await supabase
+        ({ error: conflictErr } = await supabase
           .from('exceptions')
           .delete()
           .eq('user_id', user.id)
           .eq('date', eventInput.date)
           .eq('type', 'overtime')
-          .eq('overtime_type', eventInput.overtimeType || 'weekday');
+          .eq('overtime_type', eventInput.overtimeType || 'weekday'));
       }
+      if (reportDbError('حذف الاستثناء السابق', conflictErr)) return;
 
       // Insert new exception into Supabase
-      const { data, error } = await supabase
+      const { data, error: insertErr } = await supabase
         .from('exceptions')
         .insert({
           user_id: user.id,
@@ -424,6 +479,11 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
 
+      if (reportDbError('إضافة الاستثناء', insertErr)) {
+        // The conflicting rows were already removed in the DB: mirror that locally.
+        setExceptions((prev) => prev.filter((e) => !conflictFilter(e)));
+        return;
+      }
       if (data) {
         const newEvent: ExceptionEvent = {
           id: data.id,
@@ -454,7 +514,8 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const deleteException = async (id: string) => {
     if (user) {
-      await supabase.from('exceptions').delete().eq('user_id', user.id).eq('id', id);
+      const { error } = await supabase.from('exceptions').delete().eq('user_id', user.id).eq('id', id);
+      if (reportDbError('حذف الاستثناء', error)) return;
       setExceptions((prev) => prev.filter((e) => e.id !== id));
     } else {
       const updated = exceptions.filter((e) => e.id !== id);
@@ -465,7 +526,8 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const deleteExceptionByDate = async (dateStr: string) => {
     if (user) {
-      await supabase.from('exceptions').delete().eq('user_id', user.id).eq('date', dateStr);
+      const { error } = await supabase.from('exceptions').delete().eq('user_id', user.id).eq('date', dateStr);
+      if (reportDbError('حذف استثناءات اليوم', error)) return;
       setExceptions((prev) => prev.filter((e) => e.date !== dateStr));
     } else {
       const updated = exceptions.filter((e) => e.date !== dateStr);
@@ -477,9 +539,17 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   const clearAllData = async () => {
     if (user) {
       // Clear Supabase exceptions, monthly salaries, payments & reset settings
-      await supabase.from('exceptions').delete().eq('user_id', user.id);
-      await supabase.from('monthly_salaries').delete().eq('user_id', user.id);
-      await supabase.from('payments').delete().eq('user_id', user.id);
+      const results = await Promise.all([
+        supabase.from('exceptions').delete().eq('user_id', user.id),
+        supabase.from('monthly_salaries').delete().eq('user_id', user.id),
+        supabase.from('payments').delete().eq('user_id', user.id),
+        supabase.from('schedule_periods').delete().eq('user_id', user.id),
+      ]);
+      const deleteErr = results.find((r) => r.error)?.error;
+      if (reportDbError('مسح البيانات', deleteErr)) {
+        await fetchUserData(user.id);
+        return;
+      }
       await supabase.from('user_settings').upsert({
         user_id: user.id,
         base_salary: defaultSettings.baseSalary,
@@ -495,7 +565,9 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     setExceptions([]);
     setMonthlySalaries({});
     setPayments([]);
-    
+    setSchedulePeriods([]);
+
+    localStorage.removeItem('salary_schedule_periods');
     localStorage.removeItem('salary_settings');
     localStorage.removeItem('salary_exceptions');
     localStorage.removeItem('salary_monthly_salaries');
@@ -538,16 +610,23 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     const y = targetYear !== undefined ? targetYear : year;
     const m = targetMonth !== undefined ? targetMonth : month;
     const key = `${y}-${m}`;
-    const updated = { ...monthlySalaries, [key]: salary };
+    const previousValue = monthlySalariesRef.current[key];
+    const updated = { ...monthlySalariesRef.current, [key]: salary };
     setMonthlySalaries(updated);
 
     if (user) {
-      await supabase.from('monthly_salaries').upsert({
+      const { error } = await supabase.from('monthly_salaries').upsert({
         user_id: user.id,
         year: y,
         month: m,
         base_salary: salary,
       });
+      if (reportDbError('راتب الشهر', error)) {
+        const reverted = { ...monthlySalariesRef.current };
+        if (previousValue === undefined) delete reverted[key];
+        else reverted[key] = previousValue;
+        setMonthlySalaries(reverted);
+      }
     } else {
       localStorage.setItem('salary_monthly_salaries', JSON.stringify(updated));
     }
@@ -557,12 +636,16 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
     const y = targetYear !== undefined ? targetYear : year;
     const m = targetMonth !== undefined ? targetMonth : month;
     const key = `${y}-${m}`;
-    const updated = { ...monthlySalaries };
+    const previousValue = monthlySalariesRef.current[key];
+    const updated = { ...monthlySalariesRef.current };
     delete updated[key];
     setMonthlySalaries(updated);
 
     if (user) {
-      await supabase.from('monthly_salaries').delete().eq('user_id', user.id).eq('year', y).eq('month', m);
+      const { error } = await supabase.from('monthly_salaries').delete().eq('user_id', user.id).eq('year', y).eq('month', m);
+      if (reportDbError('حذف راتب الشهر', error) && previousValue !== undefined) {
+        setMonthlySalaries({ ...monthlySalariesRef.current, [key]: previousValue });
+      }
     } else {
       localStorage.setItem('salary_monthly_salaries', JSON.stringify(updated));
     }
@@ -570,12 +653,14 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const addPayment = async (paymentInput: { date: string; amount: number; note?: string }) => {
     if (user) {
+      // Store year/month of the payment's own date (not the month currently on screen).
+      const [payYear, payMonth] = paymentInput.date.split('-').map(Number);
       const { data, error } = await supabase
         .from('payments')
         .insert({
           user_id: user.id,
-          year,
-          month,
+          year: payYear,
+          month: payMonth - 1,
           amount: paymentInput.amount,
           date: paymentInput.date,
           note: paymentInput.note || '',
@@ -583,6 +668,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
 
+      if (reportDbError('إضافة الدفعة', error)) return;
       if (data) {
         const newPayment: Payment = {
           id: data.id,
@@ -607,7 +693,8 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const deletePayment = async (id: string) => {
     if (user) {
-      await supabase.from('payments').delete().eq('user_id', user.id).eq('id', id);
+      const { error } = await supabase.from('payments').delete().eq('user_id', user.id).eq('id', id);
+      if (reportDbError('حذف الدفعة', error)) return;
       setPayments((prev) => prev.filter((p) => p.id !== id));
     } else {
       const updated = payments.filter((p) => p.id !== id);
@@ -618,15 +705,19 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const updatePayment = async (id: string, updates: { date: string; amount: number; note?: string }) => {
     if (user) {
-      await supabase
+      const [payYear, payMonth] = updates.date.split('-').map(Number);
+      const { error } = await supabase
         .from('payments')
         .update({
           amount: updates.amount,
           date: updates.date,
+          year: payYear,
+          month: payMonth - 1,
           note: updates.note || '',
         })
         .eq('user_id', user.id)
         .eq('id', id);
+      if (reportDbError('تعديل الدفعة', error)) return;
       setPayments((prev) =>
         prev.map((p) =>
           p.id === id
@@ -648,7 +739,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   // ── Schedule Period CRUD ─────────────────────────────────────────────────────
   const addSchedulePeriod = async (period: Omit<WorkSchedulePeriod, 'id'>) => {
     if (user) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('schedule_periods')
         .insert({
           user_id: user.id,
@@ -660,6 +751,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         })
         .select()
         .single();
+      if (reportDbError('إضافة جدول الدوام', error)) return;
       if (data) {
         const newPeriod: WorkSchedulePeriod = {
           id: data.id,
@@ -683,13 +775,14 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const updateSchedulePeriod = async (id: string, period: Omit<WorkSchedulePeriod, 'id'>) => {
     if (user) {
-      await supabase.from('schedule_periods').update({
+      const { error } = await supabase.from('schedule_periods').update({
         effective_from: period.effectiveFrom,
         label: period.label || '',
         start_time: period.startTime,
         end_time: period.endTime,
         break_minutes: period.breakMinutes,
       }).eq('user_id', user.id).eq('id', id);
+      if (reportDbError('تعديل جدول الدوام', error)) return;
       setSchedulePeriods((prev) =>
         prev.map((p) => (p.id === id ? { id, ...period } : p))
             .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))
@@ -705,7 +798,8 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
 
   const deleteSchedulePeriod = async (id: string) => {
     if (user) {
-      await supabase.from('schedule_periods').delete().eq('user_id', user.id).eq('id', id);
+      const { error } = await supabase.from('schedule_periods').delete().eq('user_id', user.id).eq('id', id);
+      if (reportDbError('حذف جدول الدوام', error)) return;
       setSchedulePeriods((prev) => prev.filter((p) => p.id !== id));
     } else {
       const updated = schedulePeriods.filter((p) => p.id !== id);
@@ -745,18 +839,51 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
   const realYear = today.getFullYear();
   const realMonth = today.getMonth(); // 0-based
 
+  // Start from January of the current year, or earlier if older records exist, so that
+  // earnings and payments always cover the same period (also after the year changes).
+  let startYear = realYear;
+  let startMonth = 0;
+  const considerStart = (y: number, m: number) => {
+    if (!Number.isInteger(y) || !Number.isInteger(m) || y < 2000 || m < 0 || m > 11) return;
+    if (y < startYear || (y === startYear && m < startMonth)) {
+      startYear = y;
+      startMonth = m;
+    }
+  };
+  exceptions.forEach((e) => {
+    const [ey, em] = e.date.split('-').map(Number);
+    considerStart(ey, em - 1);
+  });
+  payments.forEach((p) => {
+    const [py, pm] = p.date.split('-').map(Number);
+    considerStart(py, pm - 1);
+  });
+  Object.keys(monthlySalaries).forEach((key) => {
+    const [sy, sm] = key.split('-').map(Number);
+    considerStart(sy, sm);
+  });
+
   let cumulativeTotalEarned = 0;
-  for (let m = 0; m <= realMonth; m++) {
+  let cy = startYear;
+  let cm = startMonth;
+  while (cy < realYear || (cy === realYear && cm <= realMonth)) {
+    const loopYear = cy;
+    const loopMonth = cm;
     const monthExceptions = exceptions.filter((e) => {
       const [ey, em] = e.date.split('-').map(Number);
-      return ey === realYear && (em - 1) === m;
+      return ey === loopYear && (em - 1) === loopMonth;
     });
-    const customMonthlySalary = monthlySalaries[`${realYear}-${m}`];
-    const monthResult = calculateMonthlySalary(realYear, m, settingsWithSchedule, monthExceptions, holidays, customMonthlySalary);
+    const customMonthlySalary = monthlySalaries[`${loopYear}-${loopMonth}`];
+    const monthResult = calculateMonthlySalary(loopYear, loopMonth, settingsWithSchedule, monthExceptions, holidays, customMonthlySalary);
     cumulativeTotalEarned += monthResult.netSalary;
+    cm++;
+    if (cm > 11) {
+      cm = 0;
+      cy++;
+    }
   }
 
-  // Total paid = every payment ever recorded (across all dates/years)
+  // Total paid = every payment ever recorded (earnings above start at the oldest record)
   const cumulativeTotalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
   const cumulativeBalance = cumulativeTotalEarned - cumulativeTotalPaid;

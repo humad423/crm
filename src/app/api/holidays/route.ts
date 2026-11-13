@@ -25,8 +25,15 @@ const STATIC_2026_HOLIDAYS: Holiday[] = [
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const year = searchParams.get('year') || '2026';
-  const apiKey = searchParams.get('apiKey') || '';
+  const rawYear = searchParams.get('year') || String(new Date().getFullYear());
+  // Only accept a plain 4-digit year: it is interpolated into outbound API URLs.
+  if (!/^\d{4}$/.test(rawYear) || Number(rawYear) < 1900 || Number(rawYear) > 2200) {
+    return NextResponse.json({ error: 'Invalid year' }, { status: 400 });
+  }
+  const year = rawYear;
+  const rawKey = (searchParams.get('apiKey') || '').trim();
+  // Google API keys are URL-safe tokens; reject anything else instead of injecting it into the URL.
+  const apiKey = /^[A-Za-z0-9_-]{10,100}$/.test(rawKey) ? rawKey : '';
 
   let holidays: Holiday[] = [];
 
@@ -38,9 +45,9 @@ export async function GET(request: Request) {
       const timeMax = `${year}-12-31T23:59:59Z`;
       const googleApiUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
         calendarId
-      )}/events?key=${apiKey}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=100`;
+      )}/events?key=${encodeURIComponent(apiKey)}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&maxResults=100`;
 
-      const response = await fetch(googleApiUrl);
+      const response = await fetch(googleApiUrl, { signal: AbortSignal.timeout(8000) });
       if (response.ok) {
         const data = await response.json();
         if (data.items && Array.isArray(data.items)) {
@@ -67,7 +74,7 @@ export async function GET(request: Request) {
   // Fallback 1: Nager.Date Public Holidays API (Free, no key required)
   try {
     const fallbackUrl = `https://date.nager.at/api/v3/PublicHolidays/${year}/TR`;
-    const response = await fetch(fallbackUrl);
+    const response = await fetch(fallbackUrl, { signal: AbortSignal.timeout(8000) });
     if (response.ok) {
       const data = await response.json();
       if (Array.isArray(data)) {

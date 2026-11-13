@@ -69,8 +69,9 @@ export default function ExceptionModal({ dateStr, onClose }: ExceptionModalProps
 
   const getDayNameInArabic = (dateString: string) => {
     const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    const date = new Date(dateString);
-    return days[date.getDay()];
+    // Parse as a local date: new Date('YYYY-MM-DD') is UTC and can shift the weekday.
+    const [y, m, d] = dateString.split('-').map(Number);
+    return days[new Date(y, m - 1, d).getDay()];
   };
 
   const formatDateLabel = (dateString: string) => {

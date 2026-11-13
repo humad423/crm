@@ -1,6 +1,7 @@
 import { DayBreakdown, MonthlyCalculationResult, UserSettings, ExceptionEvent, Payment, Holiday } from '../types/salary';
 import { calculateMonthlySalary } from './salaryCalculator';
 import { ReportLang, reportTranslations } from './translations';
+import { escapeHtml } from './escape';
 
 /**
  * Generates and prints a professional PDF report of the monthly salary calculation.
@@ -80,7 +81,7 @@ export function exportMonthToPDF(
     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
     let dayTypeLabel = t.regularDay;
-    if (day.isHoliday) dayTypeLabel = `${t.holidayDay}: ${day.holidayName || ''}`;
+    if (day.isHoliday) dayTypeLabel = `${t.holidayDay}: ${escapeHtml(day.holidayName || '')}`;
     else if (isWeekend) dayTypeLabel = t.weekendDay;
 
     let exceptionLabel = '-';
@@ -95,7 +96,7 @@ export function exportMonthToPDF(
 
     // Retrieve note from exception events of this day
     const dayExceptions = exceptions.filter((e) => e.date === day.date);
-    const noteText = dayExceptions.map(e => e.note).filter(Boolean).join(' | ') || '-';
+    const noteText = escapeHtml(dayExceptions.map(e => e.note).filter(Boolean).join(' | ') || '-');
 
     const rowBg = day.absenceDays > 0 ? '#fef2f2' : (day.isHoliday ? '#faf5ff' : (isWeekend ? '#f8fafc' : '#ffffff'));
 
@@ -131,7 +132,7 @@ export function exportMonthToPDF(
       paymentsRowsHtml += `
         <tr style="text-align: center; font-size: 11px;">
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 600;">${d}/${m}/${y}</td>
-          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: ${isRtl ? 'right' : 'left'};">${p.note || '-'}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: ${isRtl ? 'right' : 'left'};">${escapeHtml(p.note || '-')}</td>
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold; color: #059669;">${formatCurrency(p.amount)}</td>
         </tr>
       `;
@@ -351,7 +352,7 @@ export function exportRangeToPDF(
   
   // Find all year-month pairs in the range
   const monthsInRange: { year: number; month: number }[] = [];
-  let curr = new Date(start.getFullYear(), start.getMonth(), 1);
+  const curr = new Date(start.getFullYear(), start.getMonth(), 1);
   const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
   
   while (curr <= targetEnd) {
@@ -447,7 +448,7 @@ export function exportRangeToPDF(
       paymentsRowsHtml += `
         <tr style="text-align: center; font-size: 11px;">
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: 600;">${d}/${m}/${y}</td>
-          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: ${isRtl ? 'right' : 'left'};">${p.note || '-'}</td>
+          <td style="padding: 6px; border: 1px solid #e2e8f0; text-align: ${isRtl ? 'right' : 'left'};">${escapeHtml(p.note || '-')}</td>
           <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold; color: #059669;">${formatCurrency(p.amount)}</td>
         </tr>
       `;

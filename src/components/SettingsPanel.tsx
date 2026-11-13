@@ -120,9 +120,10 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     }, 1500);
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (window.confirm('هل أنت متأكد من رغبتك في مسح كافة البيانات المسجلة والعودة للإعدادات الافتراضية؟')) {
-      clearAllData();
+      // Wait for the database deletes to finish before reloading, otherwise they can be cut off.
+      await clearAllData();
       // Reload page to reset states completely
       window.location.reload();
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { IncomeSource, IncomeEntry, MonthlyIncomeSummary, SourceSummary } from '../types/income';
 import { fetchLiveUsdRate } from '../utils/exchangeRate';
 import { supabase } from '../utils/supabaseClient';
@@ -224,8 +224,28 @@ const generateInitialEntries = (rate = 38.5): IncomeEntry[] => {
 const IncomeContext = createContext<IncomeContextType | undefined>(undefined);
 
 export function IncomeProvider({ children }: { children: ReactNode }) {
-  const [sources, setSources] = useState<IncomeSource[]>(defaultSources);
-  const [entries, setEntries] = useState<IncomeEntry[]>([]);
+  const [sources, setSourcesState] = useState<IncomeSource[]>(defaultSources);
+  const [entries, setEntriesState] = useState<IncomeEntry[]>([]);
+  // Always-current copies: actions may be awaited in a loop (batch entry), where the
+  // `sources`/`entries` captured by the closure would be stale and drop earlier items.
+  const sourcesRef = useRef<IncomeSource[]>(defaultSources);
+  const entriesRef = useRef<IncomeEntry[]>([]);
+  const setSources = (list: IncomeSource[]) => {
+    sourcesRef.current = list;
+    setSourcesState(list);
+  };
+  const setEntries = (list: IncomeEntry[]) => {
+    entriesRef.current = list;
+    setEntriesState(list);
+  };
+  const reportDbError = (action: string, error: { message?: string } | null | undefined): boolean => {
+    if (!error) return false;
+    console.error(`Supabase ${action} failed:`, error);
+    if (typeof window !== 'undefined') {
+      window.alert(`تعذّر حفظ التغيير في قاعدة البيانات (${action}). البيانات محفوظة على هذا الجهاز فقط حالياً.\n${error.message ?? ''}`);
+    }
+    return true;
+  };
   const [usdExchangeRate, setUsdExchangeRateState] = useState<number>(38.5); // Default TRY per 1 USD
   const [isLiveRateLoading, setIsLiveRateLoading] = useState<boolean>(false);
   const [displayCurrency, setDisplayCurrencyState] = useState<'TRY' | 'USD'>('TRY');
@@ -237,8 +257,9 @@ export function IncomeProvider({ children }: { children: ReactNode }) {
       if (savedFrom) return savedFrom;
     }
     const d = new Date();
-    // Default to first day of current month if no saved value
-    const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+    // Default to the first day of the PREVIOUS month, matching the default end date below
+    // (starting at the current month would make the range empty: from > to).
+    const firstDay = new Date(d.getFullYear(), d.getMonth() - 1, 1);
     const y = firstDay.getFullYear();
     const m = String(firstDay.getMonth() + 1).padStart(2, '0');
     const day = String(firstDay.getDate()).padStart(2, '0');
@@ -296,8 +317,10 @@ export function IncomeProvider({ children }: { children: ReactNode }) {
 
         // 1. Try fetching Sources & Entries from Supabase Database
         try {
-          const { data: dbSources } = await supabase.from('personal_income_sources').select('*');
-          const { data: dbEntries } = await supabase.from('personal_income_entries').select('*');
+          const { data: dbSources, error: sourcesErr } = await supabase.from('personal_income_sources').select('*');
+          const { data: dbEntries, error: entriesErr } = await supabase.from('personal_income_entries').select('*');
+          if (sourcesErr) console.error('Failed to load income sources:', sourcesErr);
+          if (entriesErr) console.error('Failed to load income entries:', entriesErr);
 
           if (dbSources && dbSources.length > 0) {
             const parsedSources = deduplicateSources(dbSources.map(mapDbToSource));
@@ -412,10 +435,12 @@ const deduplicateSources = (rawSources: IncomeSource[]): IncomeSource[] => {
     }
     try {
       if (overwrite) {
-        await supabase.from('personal_income_sources').delete().neq('id', 'dummy_id');
+        const { error } = await supabase.from('personal_income_sources').delete().neq('id', 'dummy_id');
+        if (reportDbError('مصادر الدخل', error)) return;
       }
       if (clean.length > 0) {
-        await supabase.from('personal_income_sources').upsert(clean.map(mapSourceToDb));
+        const { error } = await supabase.from('personal_income_sources').upsert(clean.map(mapSourceToDb));
+        reportDbError('مصادر الدخل', error);
       }
     } catch (err) {
       console.error('Supabase sources sync error', err);
@@ -430,13 +455,15 @@ const deduplicateSources = (rawSources: IncomeSource[]): IncomeSource[] => {
     }
     try {
       if (overwrite) {
-        await supabase.from('personal_income_entries').delete().neq('id', 'dummy_id');
+        const { error } = await supabase.from('personal_income_entries').delete().neq('id', 'dummy_id');
+        if (reportDbError('سجل الدخل', error)) return;
       }
       if (clean.length > 0) {
         const dbRows = clean.map(mapEntryToDb);
         const chunkSize = 50;
         for (let i = 0; i < dbRows.length; i += chunkSize) {
-          await supabase.from('personal_income_entries').upsert(dbRows.slice(i, i + chunkSize));
+          const { error } = await supabase.from('personal_income_entries').upsert(dbRows.slice(i, i + chunkSize));
+          if (reportDbError('سجل الدخل', error)) break;
         }
       }
     } catch (err) {
@@ -453,24 +480,28 @@ const deduplicateSources = (rawSources: IncomeSource[]): IncomeSource[] => {
       id: `src_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       createdAt: new Date().toISOString()
     };
-    const updated = [...sources, newSource];
+    const updated = [...sourcesRef.current, newSource];
     await saveSourcesToStorage(updated);
   };
 
 
 
   const updateSource = async (id: string, updates: Partial<Omit<IncomeSource, 'id'>>) => {
-    const updated = sources.map(s => s.id === id ? { ...s, ...updates } : s);
+    const updated = sourcesRef.current.map(s => s.id === id ? { ...s, ...updates } : s);
     await saveSourcesToStorage(updated);
   };
 
   const deleteSource = async (id: string) => {
-    const updatedSources = sources.filter(s => s.id !== id);
-    const updatedEntries = entries.filter(e => e.sourceId !== id);
+    const updatedSources = sourcesRef.current.filter(s => s.id !== id);
+    const updatedEntries = entriesRef.current.filter(e => e.sourceId !== id);
     await saveSourcesToStorage(updatedSources);
     await saveEntriesToStorage(updatedEntries);
     try {
-      await supabase.from('personal_income_sources').delete().eq('id', id);
+      // Remove the source's entries from the database too, otherwise they come back on reload.
+      const { error: entriesErr } = await supabase.from('personal_income_entries').delete().eq('source_id', id);
+      if (reportDbError('حذف سجلات المصدر', entriesErr)) return;
+      const { error } = await supabase.from('personal_income_sources').delete().eq('id', id);
+      reportDbError('حذف المصدر', error);
     } catch (err) {
       console.error('Supabase deleteSource error', err);
     }
@@ -488,7 +519,7 @@ const deduplicateSources = (rawSources: IncomeSource[]): IncomeSource[] => {
       id: `inc_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       createdAt: new Date().toISOString()
     };
-    const updated = [newEntry, ...entries];
+    const updated = [newEntry, ...entriesRef.current];
     await saveEntriesToStorage(updated);
   };
 
@@ -514,7 +545,7 @@ function getYearMonthFromDateStr(dateStr: string): { year: number; month: number
 }
 
   const updateEntry = async (id: string, updates: Partial<Omit<IncomeEntry, 'id' | 'netAmountUsd' | 'grossAmountUsd'>>) => {
-    const updated = entries.map(e => {
+    const updated = entriesRef.current.map(e => {
       if (e.id !== id) return e;
       const merged = { ...e, ...updates };
       const rate = merged.exchangeRateUsed || usdExchangeRate;
@@ -522,14 +553,15 @@ function getYearMonthFromDateStr(dateStr: string): { year: number; month: number
       merged.grossAmountUsd = Number((merged.grossAmount / rate).toFixed(2));
       return merged;
     });
-    saveEntriesToStorage(updated);
+    await saveEntriesToStorage(updated);
   };
 
   const deleteEntry = async (id: string) => {
-    const updated = entries.filter(e => e.id !== id);
+    const updated = entriesRef.current.filter(e => e.id !== id);
     await saveEntriesToStorage(updated);
     try {
-      await supabase.from('personal_income_entries').delete().eq('id', id);
+      const { error } = await supabase.from('personal_income_entries').delete().eq('id', id);
+      reportDbError('حذف السجل', error);
     } catch (err) {
       console.error('Supabase deleteEntry error', err);
     }
@@ -544,8 +576,10 @@ function getYearMonthFromDateStr(dateStr: string): { year: number; month: number
       localStorage.setItem('income_initialized', 'true');
     }
     try {
-      await supabase.from('personal_income_entries').delete().neq('id', 'dummy_id');
-      await supabase.from('personal_income_sources').delete().neq('id', 'dummy_id');
+      const { error: entriesErr } = await supabase.from('personal_income_entries').delete().neq('id', 'dummy_id');
+      if (reportDbError('مسح سجل الدخل', entriesErr)) return;
+      const { error: sourcesErr } = await supabase.from('personal_income_sources').delete().neq('id', 'dummy_id');
+      reportDbError('مسح مصادر الدخل', sourcesErr);
     } catch (err) {
       console.error('Supabase clearAllIncomeData error', err);
     }
