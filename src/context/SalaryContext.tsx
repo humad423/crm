@@ -350,7 +350,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
               base_salary: sal,
             };
           });
-          const { error: e2 } = await supabase.from('monthly_salaries').upsert(dbSalaries);
+          const { error: e2 } = await supabase.from('monthly_salaries').upsert(dbSalaries, { onConflict: 'user_id,year,month' });
           if (e2) failures.push(e2);
         }
 
@@ -620,7 +620,7 @@ export function SalaryProvider({ children }: { children: ReactNode }) {
         year: y,
         month: m,
         base_salary: salary,
-      });
+      }, { onConflict: 'user_id,year,month' });
       if (reportDbError('راتب الشهر', error)) {
         const reverted = { ...monthlySalariesRef.current };
         if (previousValue === undefined) delete reverted[key];

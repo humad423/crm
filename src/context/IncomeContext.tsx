@@ -6,7 +6,8 @@ import { fetchLiveUsdRate } from '../utils/exchangeRate';
 import { supabase } from '../utils/supabaseClient';
 
 // Supabase mappers
-const mapSourceToDb = (s: IncomeSource) => ({
+const mapSourceToDb = (s: IncomeSource, userId: string) => ({
+  user_id: userId,
   id: s.id,
   name: s.name,
   category: s.category,
@@ -28,7 +29,8 @@ const mapDbToSource = (row: any): IncomeSource => ({
   createdAt: row.created_at
 });
 
-const mapEntryToDb = (e: IncomeEntry) => ({
+const mapEntryToDb = (e: IncomeEntry, userId: string) => ({
+  user_id: userId,
   id: e.id,
   source_id: e.sourceId,
   date: e.date,
@@ -171,54 +173,29 @@ const defaultSources: IncomeSource[] = [
   }
 ];
 
-// Helper to generate seed initial entries for the 7 sources
-const generateInitialEntries = (rate = 38.5): IncomeEntry[] => {
-  const entries: IncomeEntry[] = [];
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
-
-  const seedConfigs = [
-    { id: 'src_job', gross: 75000, tax: 0, note: 'الراتب الأساسي وساعات الإضافي المسائي' },
-    { id: 'src_yt_storm', gross: 22000, tax: 15, note: 'أرباح Google AdSense قناة عاصفة التقنية' },
-    { id: 'src_yt_rihawi', gross: 16000, tax: 15, note: 'أرباح قناة ريحاوي ورعايات الفيديو' },
-    { id: 'src_yt_gamestan', gross: 13000, tax: 15, note: 'أرباح قناة جيم ستان' },
-    { id: 'src_web_1', gross: 19000, tax: 15, note: 'أرباح إعلانات واشتراكات الموقع الأول' },
-    { id: 'src_web_2', gross: 15000, tax: 15, note: 'أرباح تسويق بالعمولة الموقع الثاني' },
-    { id: 'src_web_3', gross: 11000, tax: 15, note: 'أرباح المقالات الممتازة الموقع الثالث' }
-  ];
-
-  for (let i = 3; i >= 0; i--) {
-    const d = new Date(currentYear, currentMonth - i, 10);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-
-    seedConfigs.forEach((cfg, idx) => {
-      const grossAmt = cfg.gross + (3 - i) * 1000;
-      const taxAmt = (grossAmt * cfg.tax) / 100;
-      const netAmt = grossAmt - taxAmt;
-      const netUsd = netAmt / rate;
-      const grossUsd = grossAmt / rate;
-
-      entries.push({
-        id: `seed_${cfg.id}_${i}`,
-        sourceId: cfg.id,
-        date: `${y}-${m}-${String(idx * 3 + 2).padStart(2, '0')}`,
-        grossAmount: grossAmt,
-        taxAmount: taxAmt,
-        netAmount: netAmt,
-        expenses: 0,
-        exchangeRateUsed: rate,
-        netAmountUsd: Number(netUsd.toFixed(2)),
-        grossAmountUsd: Number(grossUsd.toFixed(2)),
-        note: cfg.note,
-        status: 'received',
-        createdAt: new Date().toISOString()
-      });
-    });
+// Deduplication helpers to purge duplicate accumulated entries and sources
+const deduplicateEntries = (rawEntries: IncomeEntry[]): IncomeEntry[] => {
+  const seen = new Set<string>();
+  const unique: IncomeEntry[] = [];
+  for (const e of rawEntries) {
+    const key = `${e.date}_${e.sourceId}_${e.netAmount}_${e.grossAmount}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(e);
+    }
   }
+  return unique;
+};
 
-  return entries;
+const deduplicateSources = (rawSources: IncomeSource[]): IncomeSource[] => {
+  const seen = new Map<string, IncomeSource>();
+  for (const s of rawSources) {
+    const normName = s.name.trim().toLowerCase();
+    if (!seen.has(normName)) {
+      seen.set(normName, s);
+    }
+  }
+  return Array.from(seen.values());
 };
 
 const IncomeContext = createContext<IncomeContextType | undefined>(undefined);
@@ -238,6 +215,8 @@ export function IncomeProvider({ children }: { children: ReactNode }) {
     entriesRef.current = list;
     setEntriesState(list);
   };
+  // Logged-in Supabase user that owns the income data (null when logged out)
+  const userIdRef = useRef<string | null>(null);
   const reportDbError = (action: string, error: { message?: string } | null | undefined): boolean => {
     if (!error) return false;
     console.error(`Supabase ${action} failed:`, error);
@@ -296,94 +275,95 @@ export function IncomeProvider({ children }: { children: ReactNode }) {
     return liveRate;
   };
 
-  // Load state from Supabase / localStorage & fetch live rate on initial mount
+  // Device preferences + live exchange rate (not tied to an account)
   useEffect(() => {
-    const initData = async () => {
-      if (typeof window !== 'undefined') {
-        const savedRate = localStorage.getItem('usd_exchange_rate');
-        const savedCurrency = localStorage.getItem('display_currency');
-
-        let currentRate = 38.5;
-        if (savedRate) {
-          currentRate = parseFloat(savedRate) || 38.5;
-          setUsdExchangeRateState(currentRate);
-        }
-
-        if (savedCurrency === 'USD' || savedCurrency === 'TRY') {
-          setDisplayCurrencyState(savedCurrency);
-        }
-
-        const isInitializedFlag = localStorage.getItem('income_initialized');
-
-        // 1. Try fetching Sources & Entries from Supabase Database
-        try {
-          const { data: dbSources, error: sourcesErr } = await supabase.from('personal_income_sources').select('*');
-          const { data: dbEntries, error: entriesErr } = await supabase.from('personal_income_entries').select('*');
-          if (sourcesErr) console.error('Failed to load income sources:', sourcesErr);
-          if (entriesErr) console.error('Failed to load income entries:', entriesErr);
-
-          if (dbSources && dbSources.length > 0) {
-            const parsedSources = deduplicateSources(dbSources.map(mapDbToSource));
-            setSources(parsedSources);
-            localStorage.setItem('income_sources', JSON.stringify(parsedSources));
-            localStorage.setItem('income_initialized', 'true');
-          } else {
-            // Fallback to local storage
-            const savedSources = localStorage.getItem('income_sources');
-            if (savedSources !== null) {
-              const rawSources: IncomeSource[] = JSON.parse(savedSources);
-              const sanitizedSources = rawSources.map(s => ({
-                ...s,
-                taxRate: s.taxRate ?? (s.category === 'youtube' || s.category === 'website' ? 15 : 0)
-              }));
-              const deduplicated = deduplicateSources(sanitizedSources);
-              setSources(deduplicated);
-            } else if (isInitializedFlag !== 'true') {
-              setSources(defaultSources);
-              localStorage.setItem('income_sources', JSON.stringify(defaultSources));
-              localStorage.setItem('income_initialized', 'true');
-            } else {
-              setSources([]);
-            }
-          }
-
-          if (dbEntries && dbEntries.length > 0) {
-            const parsedEntries = deduplicateEntries(dbEntries.map(mapDbToEntry));
-            setEntries(parsedEntries);
-            localStorage.setItem('income_entries', JSON.stringify(parsedEntries));
-            localStorage.setItem('income_initialized', 'true');
-          } else {
-            // Fallback to local storage
-            const savedEntries = localStorage.getItem('income_entries');
-            if (savedEntries !== null) {
-              const raw: IncomeEntry[] = JSON.parse(savedEntries);
-              const deduplicated = deduplicateEntries(raw);
-              setEntries(deduplicated);
-            } else if (isInitializedFlag !== 'true') {
-              const seeds = generateInitialEntries(currentRate);
-              setEntries(seeds);
-              localStorage.setItem('income_entries', JSON.stringify(seeds));
-              localStorage.setItem('income_initialized', 'true');
-            } else {
-              setEntries([]);
-            }
-          }
-        } catch (err) {
-          console.warn('Supabase database sync fallback to local storage', err);
-        }
-
-        // Fetch fresh live exchange rate in background
-        fetchLiveUsdRate().then(live => {
-          if (live && live > 0) {
-            setUsdExchangeRateState(live);
-            localStorage.setItem('usd_exchange_rate', live.toString());
-          }
-        });
+    if (typeof window === 'undefined') return;
+    const savedRate = localStorage.getItem('usd_exchange_rate');
+    const savedCurrency = localStorage.getItem('display_currency');
+    if (savedRate) {
+      const parsed = parseFloat(savedRate);
+      if (parsed > 0) setUsdExchangeRateState(parsed);
+    }
+    if (savedCurrency === 'USD' || savedCurrency === 'TRY') {
+      setDisplayCurrencyState(savedCurrency);
+    }
+    fetchLiveUsdRate().then(live => {
+      if (live && live > 0) {
+        setUsdExchangeRateState(live);
+        localStorage.setItem('usd_exchange_rate', live.toString());
       }
-      setIsInitialized(true);
+    });
+  }, []);
+
+  // Load the logged-in user's income data; reload on login, clear on logout.
+  useEffect(() => {
+    const loadForUser = async (userId: string) => {
+      try {
+        const [{ data: dbSources, error: sourcesErr }, { data: dbEntries, error: entriesErr }] = await Promise.all([
+          supabase.from('personal_income_sources').select('*').eq('user_id', userId),
+          supabase.from('personal_income_entries').select('*').eq('user_id', userId),
+        ]);
+        if (userIdRef.current !== userId) return; // user changed while loading
+
+        if (sourcesErr || entriesErr) {
+          // Offline / temporary failure: fall back to this device's cached copy
+          console.error('Failed to load income data:', sourcesErr || entriesErr);
+          const cachedSources = localStorage.getItem('income_sources');
+          const cachedEntries = localStorage.getItem('income_entries');
+          if (cachedSources) setSources(deduplicateSources(JSON.parse(cachedSources)));
+          if (cachedEntries) setEntries(deduplicateEntries(JSON.parse(cachedEntries)));
+          return;
+        }
+
+        let loadedSources = deduplicateSources((dbSources || []).map(mapDbToSource));
+        if (loadedSources.length === 0) {
+          // New account: create the default source templates in the database
+          // (entries reference their source, so the sources must exist there).
+          loadedSources = defaultSources.map(src => ({ ...src, createdAt: new Date().toISOString() }));
+          const { error } = await supabase
+            .from('personal_income_sources')
+            .upsert(loadedSources.map(src => mapSourceToDb(src, userId)), { onConflict: 'user_id,id' });
+          reportDbError('إنشاء مصادر الدخل', error);
+        }
+        const loadedEntries = deduplicateEntries((dbEntries || []).map(mapDbToEntry));
+
+        setSources(loadedSources);
+        setEntries(loadedEntries);
+        localStorage.setItem('income_sources', JSON.stringify(loadedSources));
+        localStorage.setItem('income_entries', JSON.stringify(loadedEntries));
+      } catch (err) {
+        console.error('Income data load error', err);
+      } finally {
+        setIsInitialized(true);
+      }
     };
 
-    initData();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUserId = session?.user?.id ?? null;
+      if (nextUserId === userIdRef.current) {
+        if (!nextUserId) setIsInitialized(true);
+        return; // token refresh etc.
+      }
+      const previousUserId = userIdRef.current;
+      userIdRef.current = nextUserId;
+
+      if (nextUserId) {
+        // Defer: Supabase calls must not run inside the auth callback itself.
+        setTimeout(() => loadForUser(nextUserId), 0);
+      } else {
+        if (previousUserId) {
+          // Logged out: drop this account's cached income data from the device
+          localStorage.removeItem('income_sources');
+          localStorage.removeItem('income_entries');
+          localStorage.removeItem('income_initialized');
+        }
+        setSources([]);
+        setEntries([]);
+        setIsInitialized(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const setUsdExchangeRate = (rate: number) => {
@@ -401,106 +381,79 @@ export function IncomeProvider({ children }: { children: ReactNode }) {
     }
   };
 
-// Deduplication helpers to purge duplicate accumulated entries and sources
-const deduplicateEntries = (rawEntries: IncomeEntry[]): IncomeEntry[] => {
-  const seen = new Set<string>();
-  const unique: IncomeEntry[] = [];
-  for (const e of rawEntries) {
-    const key = `${e.date}_${e.sourceId}_${e.netAmount}_${e.grossAmount}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(e);
-    }
-  }
-  return unique;
-};
-
-const deduplicateSources = (rawSources: IncomeSource[]): IncomeSource[] => {
-  const seen = new Map<string, IncomeSource>();
-  for (const s of rawSources) {
-    const normName = s.name.trim().toLowerCase();
-    if (!seen.has(normName)) {
-      seen.set(normName, s);
-    }
-  }
-  return Array.from(seen.values());
-};
-
-  // Storage and Supabase Sync helpers
-  const saveSourcesToStorage = async (newSources: IncomeSource[], overwrite: boolean = false) => {
+  // Storage and Supabase sync helpers: update local state/cache, then write only the changed rows.
+  const saveSourcesToStorage = async (newSources: IncomeSource[], changed: IncomeSource[] = []) => {
     const clean = deduplicateSources(newSources);
     setSources(clean);
     if (typeof window !== 'undefined') {
       localStorage.setItem('income_sources', JSON.stringify(clean));
     }
+    const userId = userIdRef.current;
+    const keptIds = new Set(clean.map(src => src.id));
+    const toWrite = changed.filter(src => keptIds.has(src.id));
+    if (!userId || toWrite.length === 0) return;
     try {
-      if (overwrite) {
-        const { error } = await supabase.from('personal_income_sources').delete().neq('id', 'dummy_id');
-        if (reportDbError('مصادر الدخل', error)) return;
-      }
-      if (clean.length > 0) {
-        const { error } = await supabase.from('personal_income_sources').upsert(clean.map(mapSourceToDb));
-        reportDbError('مصادر الدخل', error);
-      }
+      const { error } = await supabase
+        .from('personal_income_sources')
+        .upsert(toWrite.map(src => mapSourceToDb(src, userId)), { onConflict: 'user_id,id' });
+      reportDbError('مصادر الدخل', error);
     } catch (err) {
       console.error('Supabase sources sync error', err);
     }
   };
 
-  const saveEntriesToStorage = async (newEntries: IncomeEntry[], overwrite: boolean = false) => {
+  const saveEntriesToStorage = async (newEntries: IncomeEntry[], changed: IncomeEntry[] = []) => {
     const clean = deduplicateEntries(newEntries);
     setEntries(clean);
     if (typeof window !== 'undefined') {
       localStorage.setItem('income_entries', JSON.stringify(clean));
     }
+    const userId = userIdRef.current;
+    const keptIds = new Set(clean.map(e => e.id));
+    const toWrite = changed.filter(e => keptIds.has(e.id));
+    if (!userId || toWrite.length === 0) return;
     try {
-      if (overwrite) {
-        const { error } = await supabase.from('personal_income_entries').delete().neq('id', 'dummy_id');
-        if (reportDbError('سجل الدخل', error)) return;
-      }
-      if (clean.length > 0) {
-        const dbRows = clean.map(mapEntryToDb);
-        const chunkSize = 50;
-        for (let i = 0; i < dbRows.length; i += chunkSize) {
-          const { error } = await supabase.from('personal_income_entries').upsert(dbRows.slice(i, i + chunkSize));
-          if (reportDbError('سجل الدخل', error)) break;
-        }
-      }
+      const { error } = await supabase
+        .from('personal_income_entries')
+        .upsert(toWrite.map(e => mapEntryToDb(e, userId)), { onConflict: 'user_id,id' });
+      reportDbError('سجل الدخل', error);
     } catch (err) {
       console.error('Supabase entries sync error', err);
     }
   };
 
-
-
   // Actions
   const addSource = async (sourceData: Omit<IncomeSource, 'id' | 'createdAt'>) => {
     const newSource: IncomeSource = {
       ...sourceData,
-      id: `src_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      id: `src_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       createdAt: new Date().toISOString()
     };
-    const updated = [...sourcesRef.current, newSource];
-    await saveSourcesToStorage(updated);
+    await saveSourcesToStorage([...sourcesRef.current, newSource], [newSource]);
   };
 
-
-
   const updateSource = async (id: string, updates: Partial<Omit<IncomeSource, 'id'>>) => {
-    const updated = sourcesRef.current.map(s => s.id === id ? { ...s, ...updates } : s);
-    await saveSourcesToStorage(updated);
+    let changed: IncomeSource | undefined;
+    const updated = sourcesRef.current.map(src => {
+      if (src.id !== id) return src;
+      changed = { ...src, ...updates };
+      return changed;
+    });
+    await saveSourcesToStorage(updated, changed ? [changed] : []);
   };
 
   const deleteSource = async (id: string) => {
-    const updatedSources = sourcesRef.current.filter(s => s.id !== id);
-    const updatedEntries = entriesRef.current.filter(e => e.sourceId !== id);
-    await saveSourcesToStorage(updatedSources);
-    await saveEntriesToStorage(updatedEntries);
+    await saveSourcesToStorage(sourcesRef.current.filter(src => src.id !== id));
+    await saveEntriesToStorage(entriesRef.current.filter(e => e.sourceId !== id));
+    const userId = userIdRef.current;
+    if (!userId) return;
     try {
-      // Remove the source's entries from the database too, otherwise they come back on reload.
-      const { error: entriesErr } = await supabase.from('personal_income_entries').delete().eq('source_id', id);
+      // The database also cascades, but delete the entries explicitly for clarity.
+      const { error: entriesErr } = await supabase
+        .from('personal_income_entries').delete().eq('user_id', userId).eq('source_id', id);
       if (reportDbError('حذف سجلات المصدر', entriesErr)) return;
-      const { error } = await supabase.from('personal_income_sources').delete().eq('id', id);
+      const { error } = await supabase
+        .from('personal_income_sources').delete().eq('user_id', userId).eq('id', id);
       reportDbError('حذف المصدر', error);
     } catch (err) {
       console.error('Supabase deleteSource error', err);
@@ -509,18 +462,14 @@ const deduplicateSources = (rawSources: IncomeSource[]): IncomeSource[] => {
 
   const addEntry = async (entryData: Omit<IncomeEntry, 'id' | 'createdAt' | 'netAmountUsd' | 'grossAmountUsd'>) => {
     const rate = entryData.exchangeRateUsed || usdExchangeRate;
-    const netUsd = entryData.netAmount / rate;
-    const grossUsd = entryData.grossAmount / rate;
-
     const newEntry: IncomeEntry = {
       ...entryData,
-      netAmountUsd: Number(netUsd.toFixed(2)),
-      grossAmountUsd: Number(grossUsd.toFixed(2)),
-      id: `inc_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      netAmountUsd: Number((entryData.netAmount / rate).toFixed(2)),
+      grossAmountUsd: Number((entryData.grossAmount / rate).toFixed(2)),
+      id: `inc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       createdAt: new Date().toISOString()
     };
-    const updated = [newEntry, ...entriesRef.current];
-    await saveEntriesToStorage(updated);
+    await saveEntriesToStorage([newEntry, ...entriesRef.current], [newEntry]);
   };
 
 // Safe date string parser (prevents timezone shifts e.g. "2025-06-30" -> year: 2025, month: 5)
@@ -545,22 +494,25 @@ function getYearMonthFromDateStr(dateStr: string): { year: number; month: number
 }
 
   const updateEntry = async (id: string, updates: Partial<Omit<IncomeEntry, 'id' | 'netAmountUsd' | 'grossAmountUsd'>>) => {
+    let changed: IncomeEntry | undefined;
     const updated = entriesRef.current.map(e => {
       if (e.id !== id) return e;
       const merged = { ...e, ...updates };
       const rate = merged.exchangeRateUsed || usdExchangeRate;
       merged.netAmountUsd = Number((merged.netAmount / rate).toFixed(2));
       merged.grossAmountUsd = Number((merged.grossAmount / rate).toFixed(2));
+      changed = merged;
       return merged;
     });
-    await saveEntriesToStorage(updated);
+    await saveEntriesToStorage(updated, changed ? [changed] : []);
   };
 
   const deleteEntry = async (id: string) => {
-    const updated = entriesRef.current.filter(e => e.id !== id);
-    await saveEntriesToStorage(updated);
+    await saveEntriesToStorage(entriesRef.current.filter(e => e.id !== id));
+    const userId = userIdRef.current;
+    if (!userId) return;
     try {
-      const { error } = await supabase.from('personal_income_entries').delete().eq('id', id);
+      const { error } = await supabase.from('personal_income_entries').delete().eq('user_id', userId).eq('id', id);
       reportDbError('حذف السجل', error);
     } catch (err) {
       console.error('Supabase deleteEntry error', err);
@@ -573,12 +525,13 @@ function getYearMonthFromDateStr(dateStr: string): { year: number; month: number
     if (typeof window !== 'undefined') {
       localStorage.setItem('income_entries', JSON.stringify([]));
       localStorage.setItem('income_sources', JSON.stringify([]));
-      localStorage.setItem('income_initialized', 'true');
     }
+    const userId = userIdRef.current;
+    if (!userId) return;
     try {
-      const { error: entriesErr } = await supabase.from('personal_income_entries').delete().neq('id', 'dummy_id');
+      const { error: entriesErr } = await supabase.from('personal_income_entries').delete().eq('user_id', userId);
       if (reportDbError('مسح سجل الدخل', entriesErr)) return;
-      const { error: sourcesErr } = await supabase.from('personal_income_sources').delete().neq('id', 'dummy_id');
+      const { error: sourcesErr } = await supabase.from('personal_income_sources').delete().eq('user_id', userId);
       reportDbError('مسح مصادر الدخل', sourcesErr);
     } catch (err) {
       console.error('Supabase clearAllIncomeData error', err);
@@ -730,8 +683,8 @@ function getYearMonthFromDateStr(dateStr: string): { year: number; month: number
 
     const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 
-    let fromDate = new Date(from);
-    let toDate = new Date(to);
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
     
     if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
        return result;
