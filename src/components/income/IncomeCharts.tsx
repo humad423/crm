@@ -141,7 +141,7 @@ export default function IncomeCharts({ summary }: IncomeChartsProps) {
               
             const heightRatio = currentNet / maxTrendNet;
             const y = currentNet > 0 ? 100 - (heightRatio * 100) : 100;
-            const x = (idx / (trendData.length - 1)) * 100;
+            const x = trendData.length > 1 ? (idx / (trendData.length - 1)) * 100 : 50;
             return `${x},${y}`;
           }).join(' ');
 
@@ -195,7 +195,7 @@ export default function IncomeCharts({ summary }: IncomeChartsProps) {
                   const heightRatio = currentNet / maxTrendNet;
                   const barHeightPct = currentNet > 0 ? (heightRatio * 100) : 0;
                   const isHovered = hoveredMonthIndex === idx;
-                  const leftPct = (idx / (trendData.length - 1)) * 100;
+                  const leftPct = trendData.length > 1 ? (idx / (trendData.length - 1)) * 100 : 50;
 
                   return (
                     <div
